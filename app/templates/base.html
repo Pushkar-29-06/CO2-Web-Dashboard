@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO2 Emissions Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-green-800 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span class="text-xl font-bold">🌍 CO2 Emissions Dashboard</span>
+                        </div>
+                    </div>
+                    <div class="text-sm text-green-200">
+                        Data Source: Maharashtra Pollution Control Board
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-gray-500 text-sm font-medium">Total CO2 Emissions</div>
+                    <div class="mt-2 text-3xl font-bold text-gray-900">
+                        {{ "%0.1f"|format(total_emissions/1000) }}K
+                    </div>
+                    <div class="mt-2 text-sm text-gray-500">Metric tons ({{ latest_year }})</div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-gray-500 text-sm font-medium">Average AQI</div>
+                    <div class="mt-2 text-3xl font-bold text-gray-900">{{ avg_aqi }}</div>
+                    <div class="mt-2 text-sm text-gray-500">Air Quality Index</div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-gray-500 text-sm font-medium">Highest Emitter</div>
+                    <div class="mt-2 text-xl font-bold text-gray-900">{{ top_city.name }}</div>
+                    <div class="mt-2 text-sm text-gray-500">
+                        {{ top_city.emission|round|int }} kt | AQI: {{ top_city.aqi }}
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-gray-500 text-sm font-medium">Cities Monitored</div>
+                    <div class="mt-2 text-3xl font-bold text-gray-900">{{ cities_count }}</div>
+                    <div class="mt-2 text-sm text-gray-500">Across Maharashtra</div>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Emissions Trend -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">CO2 Emissions Trend</h2>
+                    <img src="data:image/png;base64,{{ plots.emissions_trend }}" alt="CO2 Emissions Trend" class="w-full">
+                </div>
+                
+                <!-- City-wise Emissions -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">City-wise Emissions (Latest Year)</h2>
+                    <img src="data:image/png;base64,{{ plots.city_emissions }}" alt="City-wise Emissions" class="w-full">
+                </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- AQI vs Emissions -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">AQI vs CO2 Emissions</h2>
+                    <img src="data:image/png;base64,{{ plots.aqi_emissions }}" alt="AQI vs CO2 Emissions" class="w-full">
+                </div>
+                
+                <!-- Industrial Activity vs Emissions -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Industrial Activity vs CO2 Emissions</h2>
+                    <img src="data:image/png;base64,{{ plots.industry_emissions }}" alt="Industrial Activity vs CO2 Emissions" class="w-full">
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="mt-12 text-center text-sm text-gray-500">
+                <p>© 2024 CO2 Emissions Dashboard | Data updated monthly</p>
+                <p class="mt-1">For more information, contact the Maharashtra Pollution Control Board</p>
+            </footer>
+        </main>
+    </div>
+</body>
+</html>
