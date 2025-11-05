@@ -1,72 +1,137 @@
-# 🌍 CO2 Emissions Dashboard
+# 🌱 CO2 Emissions Dashboard
 
-An interactive web dashboard for visualizing CO2 emissions data across different cities in Maharashtra, built with Python Flask and Plotly.js.
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.0.1-green.svg)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🚀 Features
+A comprehensive web-based dashboard for analyzing and visualizing CO₂ emissions data across Maharashtra, built with Python Flask and Matplotlib.
 
-- **Interactive Visualizations**: Multiple chart types including line, bar, and scatter plots
-- **City-wise Analysis**: Compare emissions across different cities in Maharashtra
-- **Time Series Data**: Track emission trends from 2017 to 2024
-- **Responsive Design**: Works on desktop and mobile devices
-- **Interactive Filters**: Hover tooltips and dynamic updates
+## ✨ Features
 
-## 🛠️ Technologies Used
+- **Interactive Visualizations**
+  - Line charts for trend analysis
+  - Bar charts for city-wise comparisons
+  - Scatter plots for correlation analysis
+  - Responsive design for all devices
 
-- **Backend**: Python (Flask)
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Data Visualization**: Plotly.js
-- **Data Processing**: Pandas, NumPy
-- **Styling**: Tailwind CSS with custom styles
+- **Data Analysis**
+  - City-wise CO₂ emissions tracking
+  - Yearly trends (2017-2024)
+  - Industrial activity impact analysis
+  - Air Quality Index (AQI) correlation
 
-## 🚀 Getting Started
+- **Key Metrics**
+  - Total emissions by city
+  - Year-over-year change
+  - Emissions per capita
+  - Sector-wise breakdown
+
+## 🛠️ Tech Stack
+
+- **Backend**
+  - Python 3.8+
+  - Flask 3.0.0
+  - Pandas 2.2.3
+  - NumPy 1.26.3
+
+- **Visualization**
+  - Matplotlib 3.8.2
+  - Seaborn 0.13.2
+
+- **Frontend**
+  - HTML5
+  - CSS3 (Tailwind CSS)
+  - Vanilla JavaScript
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8 or higher
 - pip (Python package manager)
+- Git
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd co2-emissions-dashboard
+   git clone https://github.com/Pushkar-29-06/CO2-Web-Dashboard.git
+   cd CO2-Web-Dashboard
    ```
 
-2. Create and activate a virtual environment (recommended):
+2. **Setup virtual environment**
    ```bash
+   # Windows
    python -m venv venv
-   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+   .\venv\Scripts\activate
+   
+   # macOS/Linux
+   # python3 -m venv venv
+   # source venv/bin/activate
    ```
 
-3. Install dependencies:
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Run the application:
+4. **Run the application**
    ```bash
    python run.py
    ```
 
-5. Open your browser and navigate to:
-   ```
-   http://localhost:5000
-   ```
+5. **Access the dashboard**
+   Open your browser and navigate to: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
-## 📊 Data
+## 📂 Project Structure
 
-The dashboard uses CO2 emissions data for various cities in Maharashtra from 2017 to 2024, including:
-- CO2 emissions (kt)
-- Air Quality Index (AQI)
-- Industrial activity scores
-- Population data
-- Vehicle density
-- Forest cover percentage
+```
+CO2-Web-Dashboard/
+├── app/                    # Application package
+│   ├── __init__.py         # Flask app factory
+│   ├── routes.py           # Application routes and views
+│   ├── static/             # Static files
+│   │   └── css/
+│   │       └── style.css   # Custom styles
+│   └── templates/          # HTML templates
+│       ├── base.html       # Base template
+│       └── index.html      # Dashboard page
+├── data/                   # Data files
+│   └── processed_emissions.csv  # Main dataset
+├── .gitignore             # Git ignore file
+├── requirements.txt       # Python dependencies
+└── run.py                # Application entry point
+```
+
+## 📊 Data Sources
+
+The dashboard uses processed CO₂ emissions data with the following metrics:
+- **City-wise Data**
+  - CO₂ emissions (kt)
+  - Population
+  - Vehicle density
+  - Industrial activity score
+  - Forest cover (%)
+  - AQI (Air Quality Index)
+
+- **Time Series**
+  - Annual data from 2017 to 2024
+  - Seasonal variations
+  - Growth trends
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## 📬 Contact
 
-For any questions or feedback, please open an issue on the repository.
+For any questions or feedback, please open an issue on the [GitHub repository](https://github.com/Pushkar-29-06/CO2-Web-Dashboard).
+
+---
+
+<div align="center">
+  Made with ❤️ for a greener future
+</div>
