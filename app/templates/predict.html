@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block main_content %}
+<div class="space-y-6">
+    <!-- City Selection -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">CO₂ Emissions Predictor</h1>
+        
+        <div class="max-w-md">
+            <label for="citySelect" class="block text-sm font-medium text-gray-700 mb-2">
+                Select a city to view predictions
+            </label>
+            <div class="flex space-x-2">
+                <select id="citySelect" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500">
+                    <option value="">-- Select a city --</option>
+                    {% for city in cities %}
+                    <option value="{{ city }}">{{ city }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Prediction Results -->
+    <div id="predictionResult" class="hidden">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-4" id="cityHeader">Prediction for <span id="selectedCity"></span></h2>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="text-sm text-gray-500">Current Emissions</div>
+                    <div class="text-2xl font-bold text-green-600" id="currentEmission">-</div>
+                    <div class="text-xs text-gray-500">kt CO₂</div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="text-sm text-gray-500">2025 Prediction</div>
+                    <div class="text-2xl font-bold text-orange-600" id="predicted2025">-</div>
+                    <div class="text-xs text-gray-500">kt CO₂</div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="text-sm text-gray-500">AQI Index</div>
+                    <div class="text-2xl font-bold text-blue-600" id="aqiIndex">-</div>
+                    <div class="text-xs text-gray-500">Latest Data</div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="text-sm text-gray-500">Industrial Activity</div>
+                    <div class="text-2xl font-bold text-purple-600" id="industryScore">-</div>
+                    <div class="text-xs text-gray-500">Score (0-100)</div>
+                </div>
+            </div>
+            
+            <!-- Prediction Chart -->
+            <div class="mt-6">
+                <div id="loadingIndicator" class="hidden">
+                    <div class="flex items-center justify-center p-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                        <span class="ml-3 text-gray-600">Generating prediction...</span>
+                    </div>
+                </div>
+                <div id="chartContainer" class="text-center">
+                    <img id="predictionChart" class="mx-auto max-w-full h-auto" style="display: none;">
+                </div>
+                <div id="errorMessage" class="hidden text-red-600 text-center p-4">
+                    Error loading prediction. Please try again.
+                </div>
+            </div>
+            
+            <!-- Additional City Info -->
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="font-medium text-gray-700">Vehicle Density</div>
+                    <div class="text-gray-900 text-lg" id="vehicleDensity">-</div>
+                    <div class="text-xs text-gray-500">vehicles/km²</div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="font-medium text-gray-700">Population</div>
+                    <div class="text-gray-900 text-lg" id="population">-</div>
+                    <div class="text-xs text-gray-500">millions</div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="font-medium text-gray-700">Forest Cover</div>
+                    <div class="text-gray-900 text-lg" id="forestCover">-</div>
+                    <div class="text-xs text-gray-500">% of city area</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- How it works -->
+    <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 class="font-medium text-blue-800 mb-2">How it works:</h3>
+        <p class="text-sm text-blue-700">
+            This visualization shows historical CO₂ emissions data and future predictions for the selected city.
+            The prediction is based on a linear regression model that analyzes past trends to forecast future emissions.
+            The dotted line represents the predicted values for the next 5 years.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const citySelect = document.getElementById('citySelect');
+        const predictionResult = document.getElementById('predictionResult');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const chartImage = document.getElementById('predictionChart');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // City selection handler
+        citySelect.addEventListener('change', async function() {
+            const city = this.value;
+            
+            if (!city) {
+                predictionResult.classList.add('hidden');
+                return;
+            }
+            
+            // Show loading state
+            loadingIndicator.classList.remove('hidden');
+            chartImage.style.display = 'none';
+            errorMessage.classList.add('hidden');
+            predictionResult.classList.remove('hidden');
+            
+            try {
+                // Update city name in the header
+                document.getElementById('selectedCity').textContent = city;
+                
+                // Fetch prediction data
+                const response = await fetch(`/api/city-prediction/${encodeURIComponent(city)}`);
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'Failed to get prediction');
+                }
+                
+                // Update stats
+                const stats = data.stats;
+                document.getElementById('currentEmission').textContent = stats.current_emission.toLocaleString();
+                document.getElementById('predicted2025').textContent = stats.predicted_2025.toLocaleString();
+                document.getElementById('aqiIndex').textContent = stats.aqi;
+                document.getElementById('industryScore').textContent = stats.industry_score;
+                document.getElementById('vehicleDensity').textContent = stats.vehicle_density.toLocaleString();
+                document.getElementById('population').textContent = stats.population.toLocaleString();
+                document.getElementById('forestCover').textContent = stats.forest_cover;
+                
+                // Update chart
+                chartImage.src = `data:image/png;base64,${data.image}`;
+                chartImage.style.display = 'block';
+                chartImage.onload = function() {
+                    loadingIndicator.classList.add('hidden');
+                };
+                
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.textContent = `Error: ${error.message || 'Failed to load prediction'}`;
+                errorMessage.classList.remove('hidden');
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+        
+        // Initialize with first city if available
+        const firstCity = citySelect.options[1]?.value;
+        if (firstCity) {
+            citySelect.value = firstCity;
+            citySelect.dispatchEvent(new Event('change'));
+        }
+    });
+</script>
+{% endblock %}

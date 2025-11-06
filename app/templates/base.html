@@ -18,8 +18,16 @@
                             <span class="text-xl font-bold">🌍 CO2 Emissions Dashboard</span>
                         </div>
                     </div>
-                    <div class="text-sm text-green-200">
-                        Data Source: Maharashtra Pollution Control Board
+                    <div class="flex items-center space-x-4">
+                        <div class="text-sm text-green-200">
+                            Data Source: Maharashtra Pollution Control Board
+                        </div>
+                        <a href="{{ url_for('main.predict_co2') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                            Predict CO2
+                        </a>
+                        <button onclick="openCityComparison()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                            Compare Cities
+                        </button>
                     </div>
                 </div>
             </div>
@@ -27,6 +35,7 @@
 
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            {% block main_content %}
             <!-- KPI Cards -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <div class="bg-white p-6 rounded-lg shadow-md">
@@ -87,13 +96,187 @@
                     <img src="data:image/png;base64,{{ plots.industry_emissions }}" alt="Industrial Activity vs CO2 Emissions" class="w-full">
                 </div>
             </div>
-
-            <!-- Footer -->
-            <footer class="mt-12 text-center text-sm text-gray-500">
-                <p>© 2024 CO2 Emissions Dashboard | Data updated monthly</p>
-                <p class="mt-1">For more information, contact the Maharashtra Pollution Control Board</p>
-            </footer>
+            {% endblock %}
         </main>
     </div>
+
+    {% block modals %}
+    <!-- City Comparison Modal -->
+    <div id="cityComparisonModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Compare Cities</h3>
+                <button onclick="closeCityComparison()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select First City</label>
+                        <select id="city1" class="w-full p-2 border border-gray-300 rounded-md">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Second City</label>
+                        <select id="city2" class="w-full p-2 border border-gray-300 rounded-md">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button onclick="closeCityComparison()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button onclick="compareCities()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
+                        Compare
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // City Comparison Functions
+            function openCityComparison() {
+                const modal = document.getElementById('cityComparisonModal');
+                if (!modal) {
+                    console.error('City comparison modal not found');
+                    return;
+                }
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                // Fetch cities if not already loaded
+                const city1Select = document.getElementById('city1');
+                const city2Select = document.getElementById('city2');
+                
+                if (!city1Select || !city2Select) {
+                    console.error('City select elements not found');
+                    return;
+                }
+                
+                if (city1Select.options.length <= 1) {
+                    fetch('/api/cities')
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.text().then(text => { throw new Error(text) });
+                            }
+                            return response.json();
+                        })
+                        .then(cities => {
+                            // Clear existing options except the first one
+                            city1Select.innerHTML = '<option value="">Select a city</option>';
+                            city2Select.innerHTML = '<option value="">Select a city</option>';
+                            
+                            // Add cities to both dropdowns
+                            cities.forEach(city => {
+                                city1Select.add(new Option(city, city));
+                                city2Select.add(new Option(city, city));
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Error loading cities:', error);
+                            alert('Failed to load city list. Please refresh the page to try again.');
+                        });
+                }
+            }
+            
+            function closeCityComparison() {
+                const modal = document.getElementById('cityComparisonModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            }
+            
+            function compareCities() {
+                const city1Select = document.getElementById('city1');
+                const city2Select = document.getElementById('city2');
+                
+                if (!city1Select || !city2Select) {
+                    console.error('City select elements not found');
+                    return;
+                }
+                
+                const city1 = city1Select.value;
+                const city2 = city2Select.value;
+                
+                if (!city1 || !city2) {
+                    alert('Please select both cities to compare');
+                    return;
+                }
+                
+                if (city1 === city2) {
+                    alert('Please select two different cities to compare');
+                    return;
+                }
+                
+                // Show loading state
+                const compareBtn = document.querySelector('#cityComparisonModal button.bg-green-600');
+                if (!compareBtn) {
+                    console.error('Compare button not found');
+                    return;
+                }
+                
+                const originalText = compareBtn.textContent;
+                compareBtn.disabled = true;
+                compareBtn.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Loading...</span>';
+                
+                // Fetch comparison data
+                fetch(`/api/compare-cities?city1=${encodeURIComponent(city1)}&city2=${encodeURIComponent(city2)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => {
+                                // If the response has JSON with error details, use that
+                                if (err.error === 'City not found' && err.available_cities) {
+                                    throw new Error(`City not found. Available cities: ${err.available_cities.join(', ')}`);
+                                }
+                                throw new Error(err.error || 'Failed to compare cities');
+                            }).catch(() => {
+                                // If JSON parsing fails, use status text
+                                throw new Error(response.statusText || 'Failed to compare cities');
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Get the actual city names from the response data
+                        const city1Name = Object.keys(data.emissions)[0];
+                        const city2Name = Object.keys(data.emissions)[1];
+                        
+                        // Close the modal
+                        closeCityComparison();
+                        
+                        // Redirect to the comparison page with city parameters
+                        window.location.href = `/compare?city1=${encodeURIComponent(city1Name)}&city2=${encodeURIComponent(city2Name)}`;
+                    })
+                    .catch(error => {
+                        console.error('Error comparing cities:', error);
+                        alert(`Error: ${error.message || 'An unknown error occurred'}`);
+                    })
+                    .finally(() => {
+                        // Reset button state
+                        if (compareBtn) {
+                            compareBtn.disabled = false;
+                            compareBtn.innerHTML = originalText;
+                        }
+                    });
+            }
+            
+            // Make functions available globally
+            window.openCityComparison = openCityComparison;
+            window.closeCityComparison = closeCityComparison;
+            window.compareCities = compareCities;
+        });
+    </script>
+    {% endblock %}
 </body>
 </html>

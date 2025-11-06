@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Comparison - CO2 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-green-800 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex-shrink-0 flex items-center">
+                        <span class="text-xl font-bold">CO2 Dashboard</span>
+                    </a>
+                </div>
+                <div class="flex items-center">
+                    <a href="/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700">
+                        Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h1 class="text-2xl font-bold text-gray-800 mb-6">City Comparison</h1>
+                
+                <!-- Comparison Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- City 1 -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h2 id="city1Name" class="text-xl font-semibold mb-3">City 1</h2>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">CO₂ Emissions (kt):</span>
+                                <span id="city1Emission" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">AQI Index:</span>
+                                <span id="city1Aqi" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Industrial Score:</span>
+                                <span id="city1Industry" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- City 2 -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h2 id="city2Name" class="text-xl font-semibold mb-3">City 2</h2>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">CO₂ Emissions (kt):</span>
+                                <span id="city2Emission" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">AQI Index:</span>
+                                <span id="city2Aqi" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Industrial Score:</span>
+                                <span id="city2Industry" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts -->
+                <div class="grid grid-cols-1 gap-8">
+                    <!-- Emissions Trend Chart -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">CO₂ Emissions Trend</h3>
+                        <div class="chart-container">
+                            <canvas id="emissionTrendChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- AQI Comparison Chart -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">AQI Comparison</h3>
+                        <div class="chart-container">
+                            <canvas id="aqiComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Back Button -->
+                <div class="mt-8">
+                    <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Initialize chart variables
+        window.emissionTrendChart = null;
+        window.aqiComparisonChart = null;
+        
+        // Function to load and render charts
+        function loadAndRenderCharts() {
+            // Get city names from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const city1 = urlParams.get('city1');
+            const city2 = urlParams.get('city2');
+            
+            if (!city1 || !city2) {
+                console.error('Missing city parameters');
+                return;
+            }
+            
+            // Update city names in the UI
+            document.getElementById('city1Name').textContent = city1;
+            document.getElementById('city2Name').textContent = city2;
+            
+            console.log('Fetching comparison data for:', city1, city2);
+            
+            // Fetch comparison data
+            fetch(`/api/compare-cities?city1=${encodeURIComponent(city1)}&city2=${encodeURIComponent(city2)}`)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error('Error response:', text);
+                            throw new Error(`Failed to fetch comparison data: ${response.status} ${response.statusText}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Received data:', data);
+                    updateCityData(data, city1, city2);
+                    
+                    // Initialize charts with error handling
+                    try {
+                        console.log('Initializing emission trend chart...');
+                        initEmissionTrendChart(data.trends || {}, city1, city2);
+                    } catch (chartError) {
+                        console.error('Error initializing emission trend chart:', chartError);
+                    }
+                    
+                    try {
+                        console.log('Initializing AQI comparison chart...');
+                        initAqiComparisonChart(data.trends || {}, city1, city2);
+                    } catch (chartError) {
+                        console.error('Error initializing AQI comparison chart:', chartError);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading comparison data:', error);
+                    alert(`Error: ${error.message}. Check console for details.`);
+                });
+        }
+        
+        // Function to update city data in the UI
+        function updateCityData(data, city1, city2) {
+            // Update summary data with null checks
+            const updateIfExists = (elementId, value) => {
+                const element = document.getElementById(elementId);
+                if (element && value !== undefined && value !== null) {
+                    element.textContent = typeof value === 'number' 
+                        ? value.toLocaleString() 
+                        : value;
+                }
+            };
+
+            // Safely update each field
+            updateIfExists('city1Emission', data.emissions?.[city1]);
+            updateIfExists('city2Emission', data.emissions?.[city2]);
+            updateIfExists('city1Aqi', data.aqi?.[city1]);
+            updateIfExists('city2Aqi', data.aqi?.[city2]);
+            updateIfExists('city1Industry', data.industry?.[city1]);
+            updateIfExists('city2Industry', data.industry?.[city2]);
+        }
+        
+        // Initialize when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize charts when the page loads
+            loadAndRenderCharts();
+        });
+        
+        // Chart initialization functions
+        function initEmissionTrendChart(trends, city1, city2) {
+            try {
+                console.log('Initializing emission trend chart with data:', { trends, city1, city2 });
+                
+                const canvas = document.getElementById('emissionTrendChart');
+                if (!canvas) {
+                    console.error('Emission trend chart canvas not found');
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.error('Could not get 2D context for emission trend chart');
+                    return;
+                }
+                
+                // Destroy existing chart if it exists
+                if (window.emissionTrendChart) {
+                    try {
+                        window.emissionTrendChart.destroy();
+                    } catch (e) {
+                        console.error('Error destroying existing emission trend chart:', e);
+                    }
+                }
+                
+                // Get years and data for both cities
+                const years = Object.keys(trends[city1] || {}).sort();
+                const city1Data = years.map(year => trends[city1][year]);
+                const city2Data = years.map(year => trends[city2][year]);
+                
+                console.log('Years:', years);
+                console.log(city1, 'data:', city1Data);
+                console.log(city2, 'data:', city2Data);
+                
+                // Create new chart
+                window.emissionTrendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: years,
+                        datasets: [
+                            {
+                                label: city1,
+                                data: city1Data,
+                                borderColor: 'rgb(75, 192, 192)',
+                                tension: 0.1,
+                                fill: false
+                            },
+                            {
+                                label: city2,
+                                data: city2Data,
+                                borderColor: 'rgb(255, 99, 132)',
+                                tension: 0.1,
+                                fill: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'CO₂ Emissions Trend Comparison'
+                            },
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'CO₂ Emissions (kt)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error initializing emission trend chart:', error);
+            }
+        }
+        
+        function initAqiComparisonChart(aqiTrends, city1, city2) {
+            try {
+                console.log('Initializing AQI comparison chart with data:', { aqiTrends, city1, city2 });
+                
+                const canvas = document.getElementById('aqiComparisonChart');
+                if (!canvas) {
+                    console.error('AQI comparison chart canvas not found');
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.error('Could not get 2D context for AQI comparison chart');
+                    return;
+                }
+                
+                // Destroy existing chart if it exists
+                if (window.aqiComparisonChart) {
+                    try {
+                        window.aqiComparisonChart.destroy();
+                    } catch (e) {
+                        console.error('Error destroying existing AQI comparison chart:', e);
+                    }
+                }
+                
+                // Get years and AQI data for both cities
+                const years = Object.keys(aqiTrends[city1] || {}).sort();
+                const city1Aqi = years.map(year => aqiTrends[city1][year]);
+                const city2Aqi = years.map(year => aqiTrends[city2][year]);
+                
+                console.log('AQI Years:', years);
+                console.log(city1, 'AQI:', city1Aqi);
+                console.log(city2, 'AQI:', city2Aqi);
+                
+                // Create new chart
+                window.aqiComparisonChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: years,
+                        datasets: [
+                            {
+                                label: city1,
+                                data: city1Aqi,
+                                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                borderColor: 'rgb(75, 192, 192)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: city2,
+                                data: city2Aqi,
+                                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'AQI Comparison'
+                            },
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'AQI Index'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error initializing AQI comparison chart:', error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,15 +1,238 @@
 {% extends "base.html" %}
 
-{% block content %}
-{# This template extends base.html and uses its structure #}
+{% block main_content %}
+<!-- Main Content -->
+<div class="space-y-8">
+    <!-- Existing charts will be here -->
+    {{ super() }}
+    
+    <!-- Correlation Heatmap Section -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Correlation Analysis</h2>
+        <p class="text-gray-600 mb-4">Explore relationships between different city metrics. Values range from -1 (perfect negative correlation) to 1 (perfect positive correlation).</p>
+        {% if plots.correlation_heatmap %}
+            <div class="bg-white p-2 rounded border overflow-x-auto">
+                <img src="data:image/png;base64,{{ plots.correlation_heatmap }}" alt="Correlation Heatmap" class="mx-auto">
+            </div>
+        {% else %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-700">
+                            Correlation heatmap could not be loaded. Please try refreshing the page.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-sm text-gray-500">
+            <p>© 2024 CO2 Emissions Dashboard | Data updated monthly</p>
+            <p class="mt-1">For more information, contact the Maharashtra Pollution Control Board</p>
+        </footer>
+    </div>
+    
+    <!-- Comparison Section (initially hidden) -->
+    <div id="comparisonSection" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">City Comparison</h2>
+            
+            <!-- Comparison Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 id="city1Name" class="text-lg font-semibold mb-3">City 1</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">CO₂ Emissions (kt):</span>
+                            <span id="city1Emission" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Average AQI:</span>
+                            <span id="city1Aqi" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Industrial Activity:</span>
+                            <span id="city1Industry" class="font-medium">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 id="city2Name" class="text-lg font-semibold mb-3">City 2</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">CO₂ Emissions (kt):</span>
+                            <span id="city2Emission" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Average AQI:</span>
+                            <span id="city2Aqi" class="font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Industrial Activity:</span>
+                            <span id="city2Industry" class="font-medium">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Comparison Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-4 border rounded-lg">
+                    <h3 class="text-lg font-semibold mb-4">CO₂ Emissions Trend (2017-2024)</h3>
+                    <div id="emissionTrendChart" class="h-64"></div>
+                </div>
+                <div class="bg-white p-4 border rounded-lg">
+                    <h3 class="text-lg font-semibold mb-4">AQI Comparison (2017-2024)</h3>
+                    <div id="aqiComparisonChart" class="h-64"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Any additional JavaScript can go here if needed
     document.addEventListener('DOMContentLoaded', function() {
         // Update the year in the footer
         document.getElementById('current-year').textContent = new Date().getFullYear();
+        
+        // Initialize chart variables
+        let emissionTrendChart = null;
+        let aqiComparisonChart = null;
     });
+    
+    // Update emission trend chart
+    function updateEmissionTrendChart(trends) {
+        const ctx = document.getElementById('emissionTrendChart').getContext('2d');
+        const years = Object.keys(trends[Object.keys(trends)[0]]);
+        const cities = Object.keys(trends);
+        
+        // Destroy previous chart if it exists
+        if (window.emissionTrendChart) {
+            window.emissionTrendChart.destroy();
+        }
+        
+        const datasets = cities.map((city, index) => ({
+            label: city,
+            data: Object.values(trends[city]),
+            borderColor: index === 0 ? '#10B981' : '#3B82F6',
+            backgroundColor: index === 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+        }));
+        
+        window.emissionTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'CO₂ Emissions (kt)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update AQI comparison chart
+    function updateAqiComparisonChart(aqiTrends, city1, city2) {
+        const ctx = document.getElementById('aqiComparisonChart').getContext('2d');
+        const years = Object.keys(aqiTrends[Object.keys(aqiTrends)[0]]);
+        
+        // Destroy previous chart if it exists
+        if (window.aqiComparisonChart) {
+            window.aqiComparisonChart.destroy();
+        }
+        
+        window.aqiComparisonChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [
+                    {
+                        label: city1,
+                        data: Object.values(aqiTrends[city1]),
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: city2,
+                        data: Object.values(aqiTrends[city2]),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'AQI Index'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+    }
+    
+    // Make functions available globally
+    window.updateEmissionTrendChart = updateEmissionTrendChart;
+    window.updateAqiComparisonChart = updateAqiComparisonChart;
 </script>
 {% endblock %}
