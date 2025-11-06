@@ -18,7 +18,7 @@ A comprehensive web-based dashboard for analyzing and visualizing CO₂ emission
 ### 🤖 Prediction Model
 - **CO₂ Emissions Prediction**
   - Machine learning model for forecasting city-wise CO₂ emissions
-  - Multiple regression analysis for accurate predictions
+  - Multiple regression analysis for predictions
   - Handles various input parameters:
     - Historical emissions data
     - Industrial activity scores
