@@ -1,55 +1,137 @@
-from flask import Blueprint, render_template, jsonify, send_file, request
+from flask import Blueprint, render_template, jsonify, send_file, request, url_for, redirect
 import pandas as pd
 import os
 import io
 import base64
+import time
+import uuid
+from datetime import datetime
 import joblib
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 import numpy as np
 from collections import defaultdict
+from datetime import datetime
 
 # Set style for plots
 plt.style.use('ggplot')  # Using 'ggplot' style which is similar to seaborn
 sns.set_theme(style="whitegrid")
 
-main = Blueprint('main', __name__)
+main = Blueprint('main', __name__, static_folder='static')
+
+def save_plot(fig, filename_prefix):
+    """Save plot to static/images and return the URL."""
+    try:
+        # Create static/images directory if it doesn't exist
+        static_dir = os.path.join(os.path.dirname(__file__), 'static', 'images')
+        os.makedirs(static_dir, exist_ok=True)
+        
+        # Generate a unique filename
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
+        filepath = os.path.join(static_dir, filename)
+        
+        # Save the plot
+        fig.savefig(filepath, bbox_inches='tight', dpi=100)
+        plt.close(fig)
+        
+        # Return the URL for the saved image
+        return url_for('static', filename=f'images/{filename}')
+    except Exception as e:
+        print(f"Error saving plot: {str(e)}")
+        return None
 
 # Path to the trained model
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'co2_emission_predictor.joblib')
 
-# Load data
 def load_data():
+    """
+    Load and validate the emissions data from Excel file.
+    Returns a clean pandas DataFrame.
+    """
     try:
         # Get the absolute path to the data file
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, '..', 'data', 'processed_emissions.csv')
+        data_path = os.path.join(current_dir, '..', 'data', 'maharashtra_city_emissions_2017_2024.xlsx')
         data_path = os.path.normpath(data_path)
         
-        print(f"Attempting to load data from: {data_path}")
+        print(f"\n=== Loading data from: {data_path} ===")
         
-        # Check if file exists
+        # Check if file exists and is readable
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Data file not found at: {data_path}")
-            
-        # Read the CSV file
-        df = pd.read_csv(data_path)
+        if not os.access(data_path, os.R_OK):
+            raise PermissionError(f"No read permissions for file: {data_path}")
         
-        # Print debug info
-        print(f"Successfully loaded data. Shape: {df.shape}")
-        print(f"Columns: {df.columns.tolist()}")
-        print(f"First few rows:\n{df.head(2).to_string()}")
+        # Read the Excel file
+        df = pd.read_excel(data_path)
+        
+        # Clean column names (remove extra spaces and newlines)
+        df.columns = df.columns.str.strip()
+        
+        # Check if the DataFrame is empty
+        if df.empty:
+            raise ValueError("The Excel file is empty")
+        
+        # Define expected columns and their data types
+        expected_columns = {
+            'Year': 'int64',
+            'State': 'object',
+            'City': 'object',
+            'CO2_Emission_kt': 'float64',
+            'SO2_Annual_Avg_ugm3': 'float64',
+            'NO2_Annual_Avg_ugm3': 'float64',
+            'PM10_Annual_Avg_ugm3': 'float64',
+            'PM2.5_Annual_Avg_ugm3': 'float64',
+            'AQI_Index': 'int64',
+            'AQI_Category': 'object',
+            'Population_M': 'float64',
+            'Vehicle_Density_per_km2': 'int64',
+            'Industrial_Activity_Score': 'int64',
+            'Forest_Cover_pct': 'float64'
+        }
+        
+        # Check for missing columns
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
+        
+        # Convert data types
+        for col, dtype in expected_columns.items():
+            if col in df.columns:
+                try:
+                    if dtype == 'int64':
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('int64')
+                    elif dtype == 'float64':
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+                    elif dtype == 'object':
+                        df[col] = df[col].astype(str).str.strip()
+                except Exception as e:
+                    print(f"Warning: Could not convert column '{col}' to {dtype}: {str(e)}")
+        
+        # Clean AQI_Category values
+        if 'AQI_Category' in df.columns:
+            df['AQI_Category'] = df['AQI_Category'].str.strip().str.title()
+        
+        print(f"Successfully loaded {len(df)} records")
+        print(f"Data columns: {', '.join(df.columns)}")
+        print(f"Years available: {sorted(df['Year'].unique())}")
+        print(f"Cities available: {len(df['City'].unique())}")
+        print(f"Sample data:\n{df.head().to_string()}")
         
         return df
         
     except Exception as e:
-        print(f"Error in load_data: {str(e)}")
+        print(f"Error loading data: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
         import traceback
-        print(traceback.format_exc())
-        raise  # Re-raise the exception to be handled by the caller
+        traceback.print_exc()
+        raise Exception(f"Failed to load data: {str(e)}")
 
 @main.route('/api/cities')
 def get_cities():
@@ -241,47 +323,283 @@ def compare_cities():
 
 @main.route('/compare')
 def compare():
-    city1 = request.args.get('city1')
-    city2 = request.args.get('city2')
-    
-    if not city1 or not city2:
-        return redirect('/')
+    """
+    Compare two cities based on their emissions and air quality data.
+    Handles city selection, data loading, and template rendering.
+    """
+    try:
+        print("\n=== Starting compare route ===")
         
-    return render_template('comparison.html')
+        # Load data with error handling
+        try:
+            df = load_data()
+            print(f"Successfully loaded data with {len(df)} rows")
+        except Exception as e:
+            error_msg = f"Failed to load data: {str(e)}"
+            print(error_msg)
+            return render_template('error.html', 
+                                error_message=error_msg,
+                                error_code=500), 500
+        
+        # Get unique cities for the dropdown
+        try:
+            available_cities = sorted(df['City'].astype(str).unique().tolist())
+            if not available_cities:
+                raise ValueError("No city data available")
+                
+            print(f"Found {len(available_cities)} available cities")
+            
+        except Exception as e:
+            error_msg = f"Error processing city list: {str(e)}"
+            print(error_msg)
+            return render_template('error.html',
+                                error_message=error_msg,
+                                error_code=500), 500
+        
+        # Get city parameters if they exist
+        city1 = request.args.get('city1', '').strip()
+        city2 = request.args.get('city2', '').strip()
+        print(f"Requested cities - city1: '{city1}', city2: '{city2}'")
+        
+        # If no cities are selected, use the first two available cities as default
+        if not city1 and not city2 and len(available_cities) >= 2:
+            city1 = available_cities[0]
+            city2 = available_cities[1] if len(available_cities) > 1 else available_cities[0]
+            print(f"Using default cities: {city1} and {city2}")
+            
+            # Redirect to the same URL with default cities to update the URL in the browser
+            return redirect(url_for('main.compare', city1=city1, city2=city2))
+        
+        # If still no cities, return an error
+        if not city1 or not city2:
+            error_msg = "Please select two different cities to compare."
+            print(error_msg)
+            return render_template('error.html',
+                                error_message=error_msg,
+                                error_code=400), 400
+        
+        # Check if the provided cities exist in the dataset
+        if city1 not in available_cities or city2 not in available_cities:
+            error_msg = f"One or both cities not found in the dataset. Please select from the available cities."
+            print(error_msg)
+            return render_template('error.html',
+                                error_message=error_msg,
+                                error_code=404), 404
+        
+        # Get city data for the template
+        try:
+            print(f"Fetching data for cities: {city1} and {city2}")
+            
+            # Get all data for both cities for trend analysis
+            city1_data_all = df[df['City'] == city1].sort_values('Year')
+            city2_data_all = df[df['City'] == city2].sort_values('Year')
+            
+            # Get the most recent data for each city
+            city1_latest = city1_data_all.iloc[-1].to_dict()
+            city2_latest = city2_data_all.iloc[-1].to_dict()
+            
+            # Prepare data for charts
+            def prepare_city_data(city_name, city_df):
+                # Get all years of data for the city
+                years = city_df['Year'].astype(int).tolist()
+                
+                # Prepare emissions data for all available years
+                emissions_data = {}
+                for year in years:
+                    year_data = city_df[city_df['Year'] == year].iloc[0]
+                    emissions_data[str(year)] = float(year_data.get('CO2_Emission_kt', 0))
+                
+                # Get latest data
+                latest = city_df.iloc[-1]
+                
+                return {
+                    'name': city_name,
+                    'state': latest.get('State', ''),
+                    'year': int(latest.get('Year', 2023)),
+                    'emissions': emissions_data,
+                    'metrics': {
+                        'co2': float(latest.get('CO2_Emission_kt', 0)),
+                        'so2': float(latest.get('SO2_Annual_Avg_ugm3', 0)),
+                        'no2': float(latest.get('NO2_Annual_Avg_ugm3', 0)),
+                        'pm10': float(latest.get('PM10_Annual_Avg_ugm3', 0)),
+                        'pm25': float(latest.get('PM2.5_Annual_Avg_ugm3', 0)),
+                        'aqi': int(latest.get('AQI_Index', 0)),
+                        'population': float(latest.get('Population_M', 0)),
+                        'vehicle_density': int(latest.get('Vehicle_Density_per_km2', 0)),
+                        'industry': float(latest.get('Industrial_Activity_Score', 0)),
+                        'forest_cover': float(latest.get('Forest_Cover_pct', 0))
+                    }
+                }
+            
+            # Prepare data for both cities
+            city1_data = prepare_city_data(city1, city1_data_all)
+            city2_data = prepare_city_data(city2, city2_data_all)
+            
+            # Get unique years for x-axis
+            all_years = sorted(list(set(city1_data['emissions'].keys()) | set(city2_data['emissions'].keys())))
+            
+            # Prepare the final data structure for the template
+            template_data = {
+                'city1': city1_data['name'],
+                'city2': city2_data['name'],
+                'city1_data': city1_data,
+                'city2_data': city2_data,
+                'available_cities': available_cities,
+                'visualizations': {}
+            }
+            
+            print(f"Prepared data for template. City1: {city1}, City2: {city2}")
+            print(f"City 1 data sample: {str(city1_data)[:200]}...")
+            print(f"City 2 data sample: {str(city2_data)[:200]}...")
+            
+            # Generate comparison visualizations
+            try:
+                # Create a temporary DataFrame with just the two cities for visualization
+                comparison_df = pd.concat([city1_data_all, city2_data_all])
+                
+                # Create visualizations
+                emissions_plot = create_emissions_trend_plot(comparison_df)
+                aqi_plot = create_aqi_emissions_plot(comparison_df)
+                industry_plot = create_industry_emissions_plot(comparison_df)
+                
+                # Add visualization URLs to the template data
+                template_data['visualizations'] = {
+                    'emissions_trend': emissions_plot,
+                    'aqi_vs_emissions': aqi_plot,
+                    'industry_vs_emissions': industry_plot
+                }
+                
+                print("Successfully generated visualizations")
+                
+            except Exception as e:
+                print(f"Warning: Could not generate all visualizations: {str(e)}")
+                # Continue without visualizations if there's an error
+                import traceback
+                traceback.print_exc()
+            
+            return render_template('comparison.html', **template_data)
+            
+        except Exception as e:
+            error_msg = f"Error preparing city data: {str(e)}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            return render_template('error.html',
+                                error_message=error_msg,
+                                error_code=500), 500
+                                
+        
+    except Exception as e:
+        error_msg = f"Unexpected error in compare route: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return render_template('error.html',
+                            error_message="An unexpected error occurred. Please try again later.",
+                            error_code=500), 500
+        return "An error occurred while processing your request. Please try again later.", 500
+
+def create_heatmap_plot(df):
+    """Create a heatmap of CO2 emissions by city."""
+    try:
+        # Create pivot table for heatmap
+        heatmap_data = df.pivot_table(
+            values='CO2_Emission_kt',
+            index='City',
+            columns='Year',
+            aggfunc='mean',
+            fill_value=0
+        )
+        
+        # Create the heatmap
+        plt.figure(figsize=(12, 8))
+        cmap = LinearSegmentedColormap.from_list('emissions', ['green', 'yellow', 'red'])
+        sns.heatmap(
+            heatmap_data,
+            cmap=cmap,
+            annot=True,
+            fmt=".1f",
+            linewidths=.5,
+            cbar_kws={'label': 'CO₂ Emissions (kt)'}
+        )
+        
+        plt.title('CO₂ Emissions by City and Year', fontsize=14)
+        plt.xlabel('Year')
+        plt.ylabel('City')
+        plt.tight_layout()
+        
+        # Save to bytes buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        plt.close()
+        return base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+    except Exception as e:
+        print(f"Error creating heatmap: {str(e)}")
+        return ""
 
 @main.route('/')
 def index():
-    df = load_data()
+    try:
+        df = load_data()
+        
+        # Check if DataFrame is empty
+        if df.empty:
+            raise ValueError("No data available. The dataset is empty.")
+            
+        # Check if required columns exist
+        required_columns = ['Year', 'CO2_Emission_kt', 'AQI_Index', 'City']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns in data: {', '.join(missing_columns)}")
+            
+        latest_year = df['Year'].max()
+        latest_data = df[df['Year'] == latest_year]
+        
+        # Check if we have data for the latest year
+        if latest_data.empty:
+            raise ValueError(f"No data available for the latest year: {latest_year}")
+        
+        # Check if we have valid CO2 emission data
+        if latest_data['CO2_Emission_kt'].isnull().all() or latest_data['CO2_Emission_kt'].empty:
+            raise ValueError("No valid CO2 emission data available")
+            
+        # Calculate KPIs with error handling
+        total_emissions = latest_data['CO2_Emission_kt'].sum()
+        avg_aqi = latest_data['AQI_Index'].mean() if not latest_data['AQI_Index'].empty else 0
+        
+        # Safely get city with max emissions
+        max_emission_idx = latest_data['CO2_Emission_kt'].idxmax()
+        max_emission_city = latest_data.loc[max_emission_idx] if not pd.isna(max_emission_idx) else None
+        
+        # Generate plots
+        plots = {
+            'emissions_trend': create_emissions_trend_plot(df),
+            'city_emissions': create_city_emissions_plot(latest_data),
+            'aqi_emissions': create_aqi_emissions_plot(latest_data),
+            'industry_emissions': create_industry_emissions_plot(latest_data),
+            'correlation_heatmap': create_correlation_heatmap(latest_data),
+            'emissions_by_city': create_emissions_by_city_pie(latest_data)
+        }
+        
+        # Prepare top city data with fallbacks
+        top_city = {
+            'name': max_emission_city['City'] if max_emission_city is not None else 'N/A',
+            'emission': max_emission_city['CO2_Emission_kt'] if max_emission_city is not None else 0,
+            'aqi': max_emission_city.get('AQI_Index', 0) if max_emission_city is not None else 0
+        } if max_emission_city is not None else None
+        
+        return render_template('index.html',
+                            total_emissions=total_emissions,
+                            avg_aqi=round(avg_aqi, 1) if pd.notna(avg_aqi) else 0,
+                            top_city=top_city,
+                            latest_year=latest_year,
+                            cities_count=df['City'].nunique() if not df.empty else 0,
+                            plots=plots)
+    except Exception as e:
+        print(f"Error in index route: {str(e)}")
+        return str(e), 500
     
-    # Generate plot URLs
-    plots = {
-        'emissions_trend': create_emissions_trend_plot(df),
-        'city_emissions': create_city_emissions_plot(df),
-        'aqi_emissions': create_aqi_emissions_plot(df),
-        'industry_emissions': create_industry_emissions_plot(df)
-    }
-    
-    # Get summary statistics
-    latest_year = df['Year'].max()
-    latest_data = df[df['Year'] == latest_year]
-    total_emissions = latest_data['CO2_Emission_kt'].sum()
-    avg_aqi = latest_data['AQI_Index'].mean()
-    max_emission_city = latest_data.loc[latest_data['CO2_Emission_kt'].idxmax()]
-    
-    # Create correlation heatmap
-    plots['correlation_heatmap'] = create_correlation_heatmap(df)
-    
-    return render_template('index.html', 
-                         plots=plots,
-                         total_emissions=total_emissions,
-                         avg_aqi=round(avg_aqi, 1),
-                         top_city={
-                             'name': max_emission_city['City'],
-                             'emission': max_emission_city['CO2_Emission_kt'],
-                             'aqi': max_emission_city['AQI_Index']
-                         },
-                         cities_count=df['City'].nunique())
-                         
 def create_correlation_heatmap(df):
     """Create a correlation heatmap for numerical features with enhanced styling."""
     try:
@@ -290,7 +608,7 @@ def create_correlation_heatmap(df):
         correlation_matrix = df[numerical_cols].corr()
         
         # Set up the matplotlib figure
-        plt.figure(figsize=(14, 12))
+        fig, ax = plt.subplots(figsize=(14, 12))
         
         # Create a custom diverging colormap
         cmap = sns.diverging_palette(230, 20, as_cmap=True)
@@ -299,12 +617,13 @@ def create_correlation_heatmap(df):
         mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
         
         # Draw the heatmap with the mask and correct aspect ratio
-        ax = sns.heatmap(
+        sns.heatmap(
             correlation_matrix, 
             mask=mask,  # Only show lower triangle
             cmap=cmap, 
             vmin=-1, vmax=1, center=0,
-            square=True, 
+            square=True,
+            ax=ax, 
             linewidths=0.5, 
             cbar_kws={"shrink": 0.8, "label": "Correlation Coefficient"},
             annot=True, 
@@ -313,8 +632,8 @@ def create_correlation_heatmap(df):
         )
         
         # Rotate x-axis labels for better readability
-        plt.xticks(rotation=45, ha='right', fontsize=10)
-        plt.yticks(rotation=0, fontsize=10)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=10)
         
         # Add title and adjust layout
         plt.title('Correlation Heatmap of City Metrics', 
@@ -350,130 +669,222 @@ def create_correlation_heatmap(df):
         return None
 
 def create_emissions_trend_plot(df):
-    """Create emissions trend plot and return as base64 encoded image."""
-    plt.figure(figsize=(10, 6))
+    """Create emissions trend plot and return URL to saved image."""
+    fig, ax = plt.subplots(figsize=(10, 6))
     
     # Group by year and calculate mean emissions
     yearly_avg = df.groupby('Year')['CO2_Emission_kt'].mean()
     
     # Create the plot
-    ax = sns.lineplot(x=yearly_avg.index, y=yearly_avg.values, 
-                     marker='o', linewidth=2.5, color='#10B981')
+    sns.lineplot(x=yearly_avg.index, y=yearly_avg.values, 
+                marker='o', linewidth=2.5, color='#10B981', ax=ax)
     
     # Customize the plot
-    plt.title('Average CO2 Emissions Trend (2017-2024)', fontsize=14, pad=20)
-    plt.xlabel('Year', fontsize=12)
-    plt.ylabel('CO2 Emissions (kt)', fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    ax.set_title('Average CO2 Emissions Trend (2017-2024)', fontsize=14, pad=20)
+    ax.set_xlabel('Year', fontsize=12)
+    ax.set_ylabel('CO2 Emissions (kt)', fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.7)
     
-    # Save to a bytes buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
-    plt.close()
-    
-    # Encode to base64
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
+    # Save the plot and return the URL
+    return save_plot(fig, 'emissions_trend')
 
 def create_city_emissions_plot(df):
-    """Create city emissions plot and return as base64 encoded image."""
-    plt.figure(figsize=(10, 6))
+    """Create city emissions plot and return URL to saved image."""
+    fig, ax = plt.subplots(figsize=(10, 6))
     
     # Get latest year data and sort
     latest_year = df['Year'].max()
     latest_data = df[df['Year'] == latest_year].sort_values('CO2_Emission_kt', ascending=False).head(10)
     
     # Create the plot
-    ax = sns.barplot(x='CO2_Emission_kt', y='City', data=latest_data, hue='City', palette='viridis', legend=False)
+    sns.barplot(x='CO2_Emission_kt', y='City', data=latest_data, hue='City', palette='viridis', legend=False, ax=ax)
     
     # Customize the plot
-    plt.title(f'Top 10 Cities by CO2 Emissions ({latest_year})', fontsize=14, pad=20)
-    plt.xlabel('CO2 Emissions (kt)', fontsize=12)
-    plt.ylabel('')
-    plt.grid(True, linestyle='--', alpha=0.7, axis='x')
+    ax.set_title(f'Top 10 Cities by CO2 Emissions ({latest_year})', fontsize=14, pad=20)
+    ax.set_xlabel('CO2 Emissions (kt)', fontsize=12)
+    ax.set_ylabel('City', fontsize=12)
+    ax.grid(True, axis='x', linestyle='--', alpha=0.7)
     
-    # Save to a bytes buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
-    plt.close()
+    # Add value labels on the bars
+    for i, v in enumerate(latest_data['CO2_Emission_kt']):
+        ax.text(v + 0.1, i, f'{v:.1f}', va='center', fontsize=10)
     
-    # Encode to base64
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
+    # Save the plot and return the URL
+    return save_plot(fig, 'city_emissions')
 
 def create_aqi_emissions_plot(df):
-    """Create AQI vs Emissions scatter plot and return as base64 encoded image."""
-    plt.figure(figsize=(10, 6))
+    """Create AQI vs Emissions scatter plot and return URL to saved image."""
+    fig, ax = plt.subplots(figsize=(10, 6))
     
     # Get latest year data
     latest_year = df['Year'].max()
     latest_data = df[df['Year'] == latest_year]
     
     # Create the plot
-    scatter = plt.scatter(
+    scatter = ax.scatter(
         x=latest_data['CO2_Emission_kt'],
         y=latest_data['AQI_Index'],
-        s=latest_data['Population_M'] * 100,  # Scale point size by population
-        c=latest_data['Industrial_Activity_Score'],
+        c=latest_data['CO2_Emission_kt'],
         cmap='viridis',
-        alpha=0.7,
-        edgecolors='w',
-        linewidth=0.5
+        s=100,
+        alpha=0.7
     )
     
     # Add colorbar
-    cbar = plt.colorbar(scatter)
-    cbar.set_label('Industrial Activity Score', rotation=270, labelpad=15)
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.set_label('CO2 Emissions (kt)')
+    
+    # Add trendline
+    z = np.polyfit(latest_data['CO2_Emission_kt'], latest_data['AQI_Index'], 1)
+    p = np.poly1d(z)
+    ax.plot(latest_data['CO2_Emission_kt'], p(latest_data['CO2_Emission_kt']), 
+            'r--', alpha=0.7)
     
     # Customize the plot
-    plt.title(f'AQI vs CO2 Emissions by City ({latest_year})', fontsize=14, pad=20)
-    plt.xlabel('CO2 Emissions (kt)', fontsize=12)
-    plt.ylabel('AQI Index', fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    ax.set_title(f'AQI vs CO2 Emissions ({latest_year})', fontsize=14, pad=20)
+    ax.set_xlabel('CO2 Emissions (kt)', fontsize=12)
+    ax.set_ylabel('AQI Index', fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.7)
     
-    # Save to a bytes buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
-    plt.close()
-    
-    # Encode to base64
-    return base64.b64encode(buf.getvalue()).decode('utf-8')
+    # Save the plot and return the URL
+    return save_plot(fig, 'aqi_emissions')
 
 def create_industry_emissions_plot(df):
-    """Create industrial activity vs emissions plot and return as base64 encoded image."""
+    """Create industrial activity vs emissions plot and return URL to saved image."""
     try:
-        # Create a new figure with a specific size
-        plt.figure(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6))
         
-        # Create scatter plot with regression line
-        sns.regplot(
-            x='Industrial_Activity_Score',
-            y='CO2_Emission_kt',
-            data=df,
-            scatter_kws={'alpha':0.5, 'color':'#4CAF50'},
-            line_kws={'color':'#2E7D32'}
-        )
+        # Check if required columns exist
+        required_columns = ['Industrial_Activity_Score', 'CO2_Emission_kt']
+        missing_columns = [col for col in required_columns if col not in df.columns]
         
-        # Customize the plot
-        plt.title('Industrial Activity vs CO₂ Emissions', fontsize=14, fontweight='bold', pad=20)
-        plt.xlabel('Industrial Activity Score', fontsize=12, labelpad=10)
-        plt.ylabel('CO₂ Emissions (kt)', fontsize=12, labelpad=10)
+        if missing_columns:
+            # Create a placeholder plot with an informative message
+            ax.text(0.5, 0.5, 
+                   f'Data not available for: {", ".join(missing_columns)}',
+                   horizontalalignment='center',
+                   verticalalignment='center',
+                   transform=ax.transAxes,
+                   fontsize=12)
+            ax.set_title('Industrial Activity vs CO₂ Emissions', fontsize=14)
+            ax.axis('off')
+        else:
+            # Group by industrial activity and calculate mean emissions
+            industry_emissions = df.groupby('Industrial_Activity_Score')['CO2_Emission_kt'].mean().reset_index()
+            
+            # Create scatter plot
+            sns.scatterplot(
+                x='Industrial_Activity_Score',
+                y='CO2_Emission_kt',
+                data=industry_emissions,
+                color='#2ecc71',
+                s=100,
+                alpha=0.7,
+                ax=ax
+            )
+            
+            # Add regression line if we have enough data points
+            if len(industry_emissions) > 1:
+                sns.regplot(
+                    x='Industrial_Activity_Score',
+                    y='CO2_Emission_kt',
+                    data=industry_emissions,
+                    scatter=False,
+                    color='#e74c3c',
+                    line_kws={'linestyle': '--', 'alpha': 0.7},
+                    ax=ax
+                )
+            
+            ax.set_title('Industrial Activity vs CO₂ Emissions', fontsize=14)
+            ax.set_xlabel('Industrial Activity Score (0-100)')
+            ax.set_ylabel('Average CO₂ Emissions (kt)')
+            ax.grid(True, alpha=0.3)
         
-        # Adjust layout to prevent label cutoff
-        plt.tight_layout()
-        
-        # Save the plot to a bytes buffer
-        img = io.BytesIO()
-        plt.savefig(img, format='png')
-        img.seek(0)
-        
-        # Close the plot to free memory
-        plt.close()
-        
-        # Encode the image to base64
-        return base64.b64encode(img.getvalue()).decode('utf-8')
+        # Save the plot and return the URL
+        return save_plot(fig, 'industry_emissions')
         
     except Exception as e:
         print(f"Error creating industry emissions plot: {str(e)}")
         return None
+
+def create_emissions_by_city_pie(df):
+    """Create a pie chart of emissions by city and return URL to saved image."""
+    try:
+        # Get top 5 cities by emissions and group the rest as 'Others'
+        top_cities = df.groupby('City')['CO2_Emission_kt'].sum().nlargest(5)
+        other_emissions = df[~df['City'].isin(top_cities.index)]['CO2_Emission_kt'].sum()
+        
+        # Create data for the pie chart
+        if other_emissions > 0:
+            top_cities['Other Cities'] = other_emissions
+        
+        # Create a color palette
+        colors = sns.color_palette('pastel')[0:len(top_cities)]
+        
+        # Create the figure and axis
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Create the pie chart
+        wedges, texts, autotexts = ax.pie(
+            top_cities,
+            labels=top_cities.index,
+            colors=colors,
+            autopct='%1.1f%%',
+            startangle=90,
+            wedgeprops=dict(width=0.5, edgecolor='w'),
+            textprops={'fontsize': 10}
+        )
+        
+        # Draw a circle at the center to make it a donut chart
+        centre_circle = plt.Circle((0, 0), 0.7, fc='white')
+        fig.gca().add_artist(centre_circle)
+        
+        # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')
+        plt.title('CO₂ Emissions by City', fontsize=14)
+        
+        # Save the plot and return the URL
+        return save_plot(fig, 'emissions_by_city')
+        
+    except Exception as e:
+        print(f"Error creating emissions by city pie chart: {str(e)}")
+        return None
+
+def get_emissions_by_city_year():
+    """Get emissions data by city and year for heatmap."""
+    try:
+        df = load_data()
+        # Pivot to get cities as rows and years as columns
+        pivot_df = df.pivot_table(
+            index='City',
+            columns='Year',
+            values='CO2_Emission_kt',
+            aggfunc='mean',
+            fill_value=0
+        )
+        
+        # Convert to list of dictionaries for JSON response
+        data = []
+        for city in pivot_df.index:
+            city_data = {'city': city}
+            for year in pivot_df.columns:
+                city_data[str(year)] = round(pivot_df.loc[city, year], 2)
+            data.append(city_data)
+            
+        return {
+            'cities': [str(city) for city in pivot_df.index],
+            'years': [str(year) for year in pivot_df.columns],
+            'data': data
+        }
+    except Exception as e:
+        print(f"Error getting emissions by city and year: {str(e)}")
+        return {'error': str(e)}
+
+@main.route('/api/emissions-heatmap')
+def emissions_heatmap_data():
+    """Return emissions heatmap data."""
+    data = get_emissions_by_city_year()
+    return jsonify(data)
 
 @main.route('/predict')
 def predict_co2():
@@ -594,7 +1005,80 @@ def get_city_prediction(city_name):
                          latest_year=latest_year,
                          cities_count=df['City'].nunique())
 
+@main.route('/correlation')
+def correlation_analysis():
+    """Render the correlation analysis page."""
+    try:
+        df = load_data()
+        latest_year = df['Year'].max()
+        latest_data = df[df['Year'] == latest_year]
+        
+        # Generate correlation heatmap
+        correlation_plot = create_correlation_heatmap(latest_data)
+        
+        return render_template('correlation_analysis.html', 
+                             plots={'correlation_heatmap': correlation_plot},
+                             latest_year=latest_year)
+    except Exception as e:
+        print(f"Error in correlation_analysis: {str(e)}")
+        return str(e), 500
+
 @main.route('/api/predict-co2', methods=['POST'])
+@main.route('/heatmap')
+def show_heatmap():
+    """Render the emissions heatmap page."""
+    try:
+        df = load_data()
+        # Get the most recent year's data
+        latest_year = df['Year'].max()
+        latest_data = df[df['Year'] == latest_year]
+        
+        # Create a pivot table for the heatmap
+        heatmap_data = latest_data.pivot_table(
+            values='CO2_Emission_kt',
+            index='City',
+            columns='Year',
+            aggfunc='mean'
+        )
+        
+        # Create the heatmap figure
+        plt.figure(figsize=(12, 8))
+        
+        # Define custom colormap (green-yellow-red)
+        cmap = LinearSegmentedColormap.from_list('emissions', ['green', 'yellow', 'red'])
+        
+        # Create the heatmap
+        sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt=".1f",
+            cmap=cmap,
+            linewidths=.5,
+            cbar_kws={'label': 'CO₂ Emissions (kt)'}
+        )
+        
+        plt.title(f'CO₂ Emissions by City ({latest_year})', fontsize=14)
+        plt.xlabel('Year')
+        plt.ylabel('City')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # Save the plot to a bytes buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        plot_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+        plt.close()
+        
+        return render_template('heatmap.html', 
+                            plot_url=f'data:image/png;base64,{plot_data}',
+                            year=latest_year)
+    
+    except Exception as e:
+        print(f"Error generating heatmap: {str(e)}")
+        return render_template('error.html', message="Error generating heatmap")
+
+
 def api_predict_co2():
     """API endpoint for CO2 prediction with historical data visualization."""
     try:

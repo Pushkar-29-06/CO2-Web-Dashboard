@@ -1,42 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#065f46">
+    <meta name="description" content="CO2 Emissions Dashboard - Track and compare CO2 emissions across cities">
     <title>CO2 Emissions Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Load Chart.js from CDN with integrity check -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" 
+            integrity="sha384-+pG1mS+5cKj8Z8bJk3RwZF8FjFfGxYXJ8F8FjbeUe0LbwNCf9k3f+q94LxyfV9p" 
+            crossorigin="anonymous"></script>
+    <!-- Load main.js from static/js -->
+    <script src="{{ url_for('static', filename='js/main.js') }}" type="text/javascript" defer></script>
+    <script>
+        // Mobile menu toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            if (mobileMenuButton && mobileMenu) {
+                mobileMenuButton.addEventListener('click', function() {
+                    const expanded = mobileMenuButton.getAttribute('aria-expanded') === 'true' || false;
+                    mobileMenuButton.setAttribute('aria-expanded', !expanded);
+                    mobileMenu.classList.toggle('hidden');
+                    mobileMenu.classList.toggle('block');
+                });
+            }
+            
+            // Close mobile menu when clicking outside
+            document.addEventListener('click', function(event) {
+                if (mobileMenu && !mobileMenu.contains(event.target) && !mobileMenuButton.contains(event.target)) {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenu.classList.remove('block');
+                    mobileMenuButton.setAttribute('aria-expanded', 'false');
+                }
+            });
+            
+            // Close mobile menu when a link is clicked
+            const mobileLinks = document.querySelectorAll('#mobile-menu a');
+            mobileLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenu.classList.remove('block');
+                    mobileMenuButton.setAttribute('aria-expanded', 'false');
+                });
+            });
+        });
+    </script>
+    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        // Check if JavaScript is enabled and add a class to the html element
+        document.documentElement.classList.add('js-enabled');
+    </script>
 </head>
 <body class="bg-gray-100">
     <div class="min-h-screen">
         <!-- Navigation -->
-        <nav class="bg-green-800 text-white shadow-lg">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <span class="text-xl font-bold">🌍 CO2 Emissions Dashboard</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="text-sm text-green-200">
-                            Data Source: Maharashtra Pollution Control Board
-                        </div>
-                        <a href="{{ url_for('main.predict_co2') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">
-                            Predict CO2
+        <nav class="bg-green-800 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="{{ url_for('main.index') }}" class="text-lg sm:text-xl font-bold hover:opacity-90 transition-opacity flex items-center">
+                            <span class="mr-2">🌍</span>
+                            <span class="hidden sm:inline">Carbon Scope</span>
+                            <span class="sm:hidden">CO2 Dashboard</span>
                         </a>
-                        <button onclick="openCityComparison()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">
-                            Compare Cities
-                        </button>
                     </div>
                 </div>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <div class="text-xs sm:text-sm text-green-200 mr-4">
+                        <span class="hidden sm:inline">Data Source: </span>CPCB
+                    </div>
+                    <div class="flex space-x-1 sm:space-x-2">
+                        <a href="{{ url_for('main.index') }}" class="text-white hover:bg-green-700 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                            <span class="hidden sm:inline">Dashboard</span>
+                            <span class="sm:hidden">🏠</span>
+                        </a>
+                        <a href="{{ url_for('main.predict_co2') }}" class="text-white hover:bg-green-700 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                            <span class="hidden sm:inline">CO2 Prediction</span>
+                            <span class="sm:hidden">📈</span>
+                        </a>
+                        <a href="{{ url_for('main.compare') }}" class="text-white hover:bg-green-700 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                            <span class="hidden sm:inline">Compare Cities</span>
+                            <span class="sm:hidden">🔍</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Mobile menu button -->
+                <div class="md:hidden flex items-center">
+                    <button type="button" id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-green-200 hover:text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
             </div>
-        </nav>
+        </div>
+        
+        <!-- Mobile menu, show/hide based on menu state -->
+        <div class="md:hidden hidden" id="mobile-menu">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-green-800 bg-opacity-95">
+                <a href="{{ url_for('main.index') }}" class="text-white hover:bg-green-700 block px-3 py-2 rounded-md text-base font-medium">
+                    Dashboard
+                </a>
+                <a href="{{ url_for('main.predict_co2') }}" class="text-white hover:bg-green-700 block px-3 py-2 rounded-md text-base font-medium">
+                    CO2 Prediction
+                </a>
+                <a href="{{ url_for('main.compare') }}" class="text-white hover:bg-green-700 block px-3 py-2 rounded-md text-base font-medium">
+                    Compare Cities
+                </a>
+                <div class="px-3 py-2 text-green-200 text-sm">
+                    Data Source: Maharashtra Pollution Control Board
+                </div>
+            </div>
+        </div>
+    </nav>
 
         <!-- Main Content -->
-        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 lg:px-6">
             {% block main_content %}
-            <!-- KPI Cards -->
+            <!-- Dashboard Header -->
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">CO₂ Emissions Dashboard</h2>
+                <p class="text-gray-600">Overview of CO₂ emissions and environmental metrics</p>
+            </div>
+
+            <!-- Dashboard View -->
+            <div id="dashboardView">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="text-gray-500 text-sm font-medium">Total CO2 Emissions</div>
@@ -71,31 +168,41 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <!-- Emissions Trend -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">CO2 Emissions Trend</h2>
-                    <img src="data:image/png;base64,{{ plots.emissions_trend }}" alt="CO2 Emissions Trend" class="w-full">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">CO₂ Emissions Trend</h2>
+                    <img src="{{ plots.emissions_trend }}" alt="CO2 Emissions Trend" class="w-full">
                 </div>
                 
                 <!-- City-wise Emissions -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h2 class="text-lg font-semibold text-gray-800 mb-4">City-wise Emissions (Latest Year)</h2>
-                    <img src="data:image/png;base64,{{ plots.city_emissions }}" alt="City-wise Emissions" class="w-full">
+                    <img src="{{ plots.city_emissions }}" alt="City-wise Emissions" class="w-full">
                 </div>
             </div>
 
             <!-- Charts Row 2 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <!-- AQI vs Emissions -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">AQI vs CO2 Emissions</h2>
-                    <img src="data:image/png;base64,{{ plots.aqi_emissions }}" alt="AQI vs CO2 Emissions" class="w-full">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">AQI vs CO₂ Emissions</h2>
+                    <img src="{{ plots.aqi_emissions }}" alt="AQI vs CO2 Emissions" class="w-full">
                 </div>
                 
                 <!-- Industrial Activity vs Emissions -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Industrial Activity vs CO2 Emissions</h2>
-                    <img src="data:image/png;base64,{{ plots.industry_emissions }}" alt="Industrial Activity vs CO2 Emissions" class="w-full">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Industrial Activity vs CO₂ Emissions</h2>
+                    <img src="{{ plots.industry_emissions }}" alt="Industrial Activity vs CO2 Emissions" class="w-full">
                 </div>
             </div>
+
+            <!-- Charts Row 3 - Full width -->
+            <div class="grid grid-cols-1 gap-6">
+                <!-- Emissions by City (Pie Chart) -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">CO₂ Emissions by City</h2>
+                    <img src="{{ plots.emissions_by_city }}" alt="CO2 Emissions by City" class="w-full" style="max-width: 600px; margin: 0 auto;">
+                </div>
+            </div>
+            <!-- End Dashboard View -->
             {% endblock %}
         </main>
     </div>

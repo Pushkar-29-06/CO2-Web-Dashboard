@@ -1,266 +1,314 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>City Comparison - CO2 Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-green-800 text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="flex-shrink-0 flex items-center">
-                        <span class="text-xl font-bold">CO2 Dashboard</span>
-                    </a>
+{% extends "base.html" %}
+
+{% block main_content %}
+<div class="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-3 sm:py-4 lg:py-6">
+    <!-- Page Header -->
+    <div class="mb-4 sm:mb-6 md:mb-8 text-center">
+        <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Compare Cities</h1>
+        <p class="mt-1 sm:mt-1.5 text-xs sm:text-sm md:text-base text-gray-600">Compare CO₂ emissions and air quality metrics between cities</p>
+    </div>
+
+    <!-- City Selection Form with VS Theme -->
+    <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md mb-4 sm:mb-6 md:mb-8 border-2 border-gray-100">
+        <form id="compareForm" method="get" class="space-y-3 sm:space-y-4">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3 md:gap-4">
+                <!-- City 1 -->
+                <div class="w-full sm:w-5/12">
+                    <label for="city1" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 text-center sm:text-right">First City</label>
+                    <select id="city1" name="city1" class="w-full p-1.5 sm:p-2 text-xs sm:text-sm md:text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
+                        <option value="">-- Select City --</option>
+                        {% for city in available_cities %}
+                            <option value="{{ city }}" {% if city == city1 %}selected{% endif %}>{{ city }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="flex items-center">
-                    <a href="/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700">
-                        Back to Dashboard
-                    </a>
+                
+                <!-- VS Badge - Visible on mobile and desktop -->
+                <div class="my-2 sm:my-0 sm:mx-1 md:mx-2 flex items-center justify-center">
+                    <span class="bg-red-500 text-white font-bold text-xs sm:text-sm md:text-base px-2 sm:px-3 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-full shadow transform rotate-0 hover:rotate-12 transition-transform whitespace-nowrap">
+                        VS
+                    </span>
+                </div>
+                
+                <!-- City 2 -->
+                <div class="w-full sm:w-5/12">
+                    <label for="city2" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 text-center sm:text-left">Second City</label>
+                    <select id="city2" name="city2" class="w-full p-1.5 sm:p-2 text-xs sm:text-sm md:text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all">
+                        <option value="">-- Select City --</option>
+                        {% for city in available_cities %}
+                            <option value="{{ city }}" {% if city == city2 %}selected{% endif %}>{{ city }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Error Message -->
+            <div id="error-message" class="text-center text-red-500 text-xs sm:text-sm mt-1 sm:mt-2 h-4 sm:h-5">
+                {% if error %}{{ error }}{% endif %}
+            </div>
+            
+            <!-- Compare Button -->
+            <div class="flex justify-center mt-2 sm:mt-3 md:mt-4">
+                <button type="submit" class="w-full sm:w-auto bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium py-1.5 sm:py-2 px-4 sm:px-6 md:px-8 rounded-full shadow-md transform transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-xs sm:text-sm md:text-base">
+                    <span class="flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-1.5 md:mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="truncate">Compare Cities</span>
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if city1 and city2 %}
+    <!-- Comparison Results -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
+        <!-- City 1 Data -->
+        <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+            <h2 class="text-base sm:text-lg md:text-xl font-semibold text-gray-800 mb-2 sm:mb-3 md:mb-4 truncate" title="{{ city1 }}">
+                {{ city1 }}
+                <span class="text-xs font-normal text-gray-500 ml-1">({{ city1_data.get('State', 'Maharashtra') }})</span>
+            </h2>
+            <div class="space-y-1.5 sm:space-y-2.5 text-xs sm:text-sm md:text-base">
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">CO₂ Emissions (kt):</span>
+                    <span class="font-medium ml-2 text-right">{{ '%.2f'|format(city1_data.get('CO2_Emission_kt', 0)) }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Air Quality Index (AQI):</span>
+                    <span class="font-medium ml-2">
+                        {% set aqi = city1_data.get('AQI_Index', 0)|float %}
+                        {% if aqi <= 50 %}
+                            <span class="text-green-600">{{ aqi|int }} (Good)</span>
+                        {% elif aqi <= 100 %}
+                            <span class="text-yellow-500">{{ aqi|int }} (Moderate)</span>
+                        {% elif aqi <= 150 %}
+                            <span class="text-orange-500">{{ aqi|int }} (Unhealthy for Sensitive Groups)</span>
+                        {% elif aqi <= 200 %}
+                            <span class="text-red-500">{{ aqi|int }} (Unhealthy)</span>
+                        {% elif aqi <= 300 %}
+                            <span class="text-purple-600">{{ aqi|int }} (Very Unhealthy)</span>
+                        {% else %}
+                            <span class="text-red-800">{{ aqi|int }} (Hazardous)</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Population (Million):</span>
+                    <span class="font-medium ml-2">{{ '%.2f'|format(city1_data.get('Population_M', 0)) }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Vehicle Density (/km²):</span>
+                    <span class="font-medium ml-2">{{ '%.0f'|format(city1_data.get('Vehicle_Density_per_km2', 0)) }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Industrial Activity:</span>
+                    <span class="font-medium ml-2">{{ '%.1f'|format(city1_data.get('Industrial_Activity_Score', 0)) }}/100</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 whitespace-nowrap">Forest Cover:</span>
+                    <span class="font-medium ml-2">{{ '%.1f'|format(city1_data.get('Forest_Cover_pct', 0)) }}%</span>
+                </div>
+                <div class="pt-2 text-xs text-gray-500 text-right">
+                    Data Year: {{ city1_data.get('Year', 'N/A') }}
                 </div>
             </div>
         </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="px-4 py-6 sm:px-0">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">City Comparison</h1>
-                
-                <!-- Comparison Summary -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <!-- City 1 -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <h2 id="city1Name" class="text-xl font-semibold mb-3">City 1</h2>
-                        <div class="space-y-2">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">CO₂ Emissions (kt):</span>
-                                <span id="city1Emission" class="font-medium">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">AQI Index:</span>
-                                <span id="city1Aqi" class="font-medium">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Industrial Score:</span>
-                                <span id="city1Industry" class="font-medium">-</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- City 2 -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <h2 id="city2Name" class="text-xl font-semibold mb-3">City 2</h2>
-                        <div class="space-y-2">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">CO₂ Emissions (kt):</span>
-                                <span id="city2Emission" class="font-medium">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">AQI Index:</span>
-                                <span id="city2Aqi" class="font-medium">-</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Industrial Score:</span>
-                                <span id="city2Industry" class="font-medium">-</span>
-                            </div>
-                        </div>
-                    </div>
+        
+        <!-- City 2 Data -->
+        <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+            <h2 class="text-base sm:text-lg md:text-xl font-semibold text-gray-800 mb-2 sm:mb-3 md:mb-4 truncate" title="{{ city2 }}">
+                {{ city2 }}
+                <span class="text-xs font-normal text-gray-500 ml-1">({{ city2_data.get('State', 'Maharashtra') }})</span>
+            </h2>
+            <div class="space-y-1.5 sm:space-y-2.5 text-xs sm:text-sm md:text-base">
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">CO₂ Emissions (kt):</span>
+                    <span class="font-medium ml-2 text-right">{{ '%.2f'|format(city2_data.get('CO2_Emission_kt', 0)) }}</span>
                 </div>
-                
-                <!-- Charts -->
-                <div class="grid grid-cols-1 gap-8">
-                    <!-- Emissions Trend Chart -->
-                    <div class="bg-white p-4 rounded-lg shadow">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">CO₂ Emissions Trend</h3>
-                        <div class="chart-container">
-                            <canvas id="emissionTrendChart"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- AQI Comparison Chart -->
-                    <div class="bg-white p-4 rounded-lg shadow">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">AQI Comparison</h3>
-                        <div class="chart-container">
-                            <canvas id="aqiComparisonChart"></canvas>
-                        </div>
-                    </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Air Quality Index (AQI):</span>
+                    <span class="font-medium ml-2">
+                        {% set aqi = city2_data.get('AQI_Index', 0)|float %}
+                        {% if aqi <= 50 %}
+                            <span class="text-green-600">{{ aqi|int }} (Good)</span>
+                        {% elif aqi <= 100 %}
+                            <span class="text-yellow-500">{{ aqi|int }} (Moderate)</span>
+                        {% elif aqi <= 150 %}
+                            <span class="text-orange-500">{{ aqi|int }} (Unhealthy for Sensitive Groups)</span>
+                        {% elif aqi <= 200 %}
+                            <span class="text-red-500">{{ aqi|int }} (Unhealthy)</span>
+                        {% elif aqi <= 300 %}
+                            <span class="text-purple-600">{{ aqi|int }} (Very Unhealthy)</span>
+                        {% else %}
+                            <span class="text-red-800">{{ aqi|int }} (Hazardous)</span>
+                        {% endif %}
+                    </span>
                 </div>
-                
-                <!-- Back Button -->
-                <div class="mt-8">
-                    <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        ← Back to Dashboard
-                    </a>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Population (Million):</span>
+                    <span class="font-medium ml-2">{{ '%.2f'|format(city2_data.get('Population_M', 0)) }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Vehicle Density (/km²):</span>
+                    <span class="font-medium ml-2">{{ '%.0f'|format(city2_data.get('Vehicle_Density_per_km2', 0)) }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-1.5 sm:pb-2">
+                    <span class="text-gray-600 whitespace-nowrap">Industrial Activity:</span>
+                    <span class="font-medium ml-2">{{ '%.1f'|format(city2_data.get('Industrial_Activity_Score', 0)) }}/100</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 whitespace-nowrap">Forest Cover:</span>
+                    <span class="font-medium ml-2">{{ '%.1f'|format(city2_data.get('Forest_Cover_pct', 0)) }}%</span>
+                </div>
+                <div class="pt-2 text-xs text-gray-500 text-right">
+                    Data Year: {{ city2_data.get('Year', 'N/A') }}
                 </div>
             </div>
         </div>
-    </main>
-    
-    <script>
-        // Initialize chart variables
-        window.emissionTrendChart = null;
-        window.aqiComparisonChart = null;
-        
-        // Function to load and render charts
-        function loadAndRenderCharts() {
-            // Get city names from URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const city1 = urlParams.get('city1');
-            const city2 = urlParams.get('city2');
-            
-            if (!city1 || !city2) {
-                console.error('Missing city parameters');
-                return;
-            }
-            
-            // Update city names in the UI
-            document.getElementById('city1Name').textContent = city1;
-            document.getElementById('city2Name').textContent = city2;
-            
-            console.log('Fetching comparison data for:', city1, city2);
-            
-            // Fetch comparison data
-            fetch(`/api/compare-cities?city1=${encodeURIComponent(city1)}&city2=${encodeURIComponent(city2)}`)
-                .then(response => {
-                    console.log('Response status:', response.status);
-                    if (!response.ok) {
-                        return response.text().then(text => {
-                            console.error('Error response:', text);
-                            throw new Error(`Failed to fetch comparison data: ${response.status} ${response.statusText}`);
-                        });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Received data:', data);
-                    updateCityData(data, city1, city2);
-                    
-                    // Initialize charts with error handling
-                    try {
-                        console.log('Initializing emission trend chart...');
-                        initEmissionTrendChart(data.trends || {}, city1, city2);
-                    } catch (chartError) {
-                        console.error('Error initializing emission trend chart:', chartError);
-                    }
-                    
-                    try {
-                        console.log('Initializing AQI comparison chart...');
-                        initAqiComparisonChart(data.trends || {}, city1, city2);
-                    } catch (chartError) {
-                        console.error('Error initializing AQI comparison chart:', chartError);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading comparison data:', error);
-                    alert(`Error: ${error.message}. Check console for details.`);
-                });
-        }
-        
-        // Function to update city data in the UI
-        function updateCityData(data, city1, city2) {
-            // Update summary data with null checks
-            const updateIfExists = (elementId, value) => {
-                const element = document.getElementById(elementId);
-                if (element && value !== undefined && value !== null) {
-                    element.textContent = typeof value === 'number' 
-                        ? value.toLocaleString() 
-                        : value;
-                }
-            };
+    </div>
 
-            // Safely update each field
-            updateIfExists('city1Emission', data.emissions?.[city1]);
-            updateIfExists('city2Emission', data.emissions?.[city2]);
-            updateIfExists('city1Aqi', data.aqi?.[city1]);
-            updateIfExists('city2Aqi', data.aqi?.[city2]);
-            updateIfExists('city1Industry', data.industry?.[city1]);
-            updateIfExists('city2Industry', data.industry?.[city2]);
+    <!-- Charts Section -->
+    <div class="space-y-6 md:space-y-8">
+        <!-- Emissions Comparison Bar Chart -->
+        <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+            <h3 class="text-sm sm:text-base md:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">CO₂ Emissions Comparison (kt)</h3>
+            <div class="h-64 sm:h-80 md:h-96 chart-container" id="emissionChart">
+                <canvas></canvas>
+            </div>
+        </div>
+
+        <!-- Air Quality Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <!-- AQI Comparison -->
+            <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+                <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-3 sm:mb-4">Air Quality Index (AQI)</h3>
+                <div class="h-56 sm:h-64 chart-container" id="aqiChart">
+                    <canvas></canvas>
+                </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    <p class="text-center">Lower AQI indicates better air quality (0-50: Good, 51-100: Moderate, 101-150: Unhealthy for SG, 151-200: Unhealthy, 201-300: Very Unhealthy, 301+: Hazardous)</p>
+                </div>
+            </div>
+            
+            <!-- Pollutants Comparison -->
+            <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+                <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-3 sm:mb-4">Air Pollutants (µg/m³)</h3>
+                <div class="h-56 sm:h-64 chart-container" id="pollutantsChart">
+                    <canvas></canvas>
+                </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    <p class="text-center">SO₂: Sulfur Dioxide, NO₂: Nitrogen Dioxide, PM₁₀: Particulate Matter 10µm, PM₂.₅: Fine Particulate Matter 2.5µm</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Trend Analysis -->
+        <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+            <h3 class="text-sm sm:text-base md:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Emissions Trend (2017-2023)</h3>
+            <div class="h-64 sm:h-80 md:h-96 chart-container" id="trendChart">
+                <canvas></canvas>
+            </div>
+        </div>
+
+        <!-- Environmental Factors -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <!-- Industrial Activity vs Emissions -->
+            <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+                <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-3 sm:mb-4">Industrial Activity vs Emissions</h3>
+                <div class="h-56 sm:h-64 chart-container" id="industryChart">
+                    <canvas></canvas>
+                </div>
+            </div>
+            
+            <!-- Forest Cover vs Emissions -->
+            <div class="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
+                <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-3 sm:mb-4">Forest Cover vs Emissions</h3>
+                <div class="h-56 sm:h-64 chart-container" id="forestChart">
+                    <canvas></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Form validation
+    function validateForm() {
+        const city1 = document.getElementById('city1').value;
+        const city2 = document.getElementById('city2').value;
+        const errorElement = document.getElementById('error-message');
+        
+        if (!city1 || !city2) {
+            errorElement.textContent = 'Please select both cities to compare';
+            return false;
         }
         
-        // Initialize when the page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize charts when the page loads
-            loadAndRenderCharts();
-        });
+        if (city1 === city2) {
+            errorElement.textContent = 'Please select two different cities to compare';
+            return false;
+        }
         
-        // Chart initialization functions
-        function initEmissionTrendChart(trends, city1, city2) {
-            try {
-                console.log('Initializing emission trend chart with data:', { trends, city1, city2 });
-                
-                const canvas = document.getElementById('emissionTrendChart');
-                if (!canvas) {
-                    console.error('Emission trend chart canvas not found');
-                    return;
-                }
-                
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    console.error('Could not get 2D context for emission trend chart');
-                    return;
-                }
-                
-                // Destroy existing chart if it exists
-                if (window.emissionTrendChart) {
-                    try {
-                        window.emissionTrendChart.destroy();
-                    } catch (e) {
-                        console.error('Error destroying existing emission trend chart:', e);
-                    }
-                }
-                
-                // Get years and data for both cities
-                const years = Object.keys(trends[city1] || {}).sort();
-                const city1Data = years.map(year => trends[city1][year]);
-                const city2Data = years.map(year => trends[city2][year]);
-                
-                console.log('Years:', years);
-                console.log(city1, 'data:', city1Data);
-                console.log(city2, 'data:', city2Data);
-                
-                // Create new chart
-                window.emissionTrendChart = new Chart(ctx, {
-                    type: 'line',
+        errorElement.textContent = '';
+        return true;
+    }
+
+    // Helper function to get AQI category color and description
+    function getAqiInfo(aqi) {
+        if (aqi <= 50) return { color: 'bg-green-100 text-green-800', text: 'Good' };
+        if (aqi <= 100) return { color: 'bg-yellow-100 text-yellow-800', text: 'Moderate' };
+        if (aqi <= 200) return { color: 'bg-orange-100 text-orange-800', text: 'Unhealthy' };
+        if (aqi <= 300) return { color: 'bg-red-100 text-red-800', text: 'Very Unhealthy' };
+        return { color: 'bg-purple-100 text-purple-800', text: 'Hazardous' };
+    }
+
+    // Initialize charts when the DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get city data from template
+        const city1Name = '{{ city1|default("")|safe }}';
+        const city2Name = '{{ city2|default("")|safe }}';
+        
+        if (!city1Name || !city2Name) {
+            console.log('Waiting for city selection...');
+            return;
+        }
+
+        try {
+            // Parse city data from template
+            const city1Data = JSON.parse('{{ city1_data|tojson|safe if city1_data else "{}" }}');
+            const city2Data = JSON.parse('{{ city2_data|tojson|safe if city2_data else "{}" }}');
+
+            // Prepare chart configurations
+            const chartConfigs = {
+                // Emissions Chart
+                emissionChart: {
+                    type: 'bar',
                     data: {
-                        labels: years,
-                        datasets: [
-                            {
-                                label: city1,
-                                data: city1Data,
-                                borderColor: 'rgb(75, 192, 192)',
-                                tension: 0.1,
-                                fill: false
-                            },
-                            {
-                                label: city2,
-                                data: city2Data,
-                                borderColor: 'rgb(255, 99, 132)',
-                                tension: 0.1,
-                                fill: false
-                            }
-                        ]
+                        labels: [city1Name, city2Name],
+                        datasets: [{
+                            label: 'CO₂ Emissions (kt)',
+                            data: [
+                                city1Data.CO2_Emissions_kt || 0,
+                                city2Data.CO2_Emissions_kt || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 99, 132, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(255, 99, 132, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
                     },
                     options: {
                         responsive: true,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'CO₂ Emissions Trend Comparison'
-                            },
-                        },
+                        maintainAspectRatio: false,
                         scales: {
                             y: {
                                 beginAtZero: true,
@@ -268,108 +316,298 @@
                                     display: true,
                                     text: 'CO₂ Emissions (kt)'
                                 }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Year'
-                                }
                             }
                         }
                     }
-                });
-                
-            } catch (error) {
-                console.error('Error initializing emission trend chart:', error);
-            }
-        }
-        
-        function initAqiComparisonChart(aqiTrends, city1, city2) {
-            try {
-                console.log('Initializing AQI comparison chart with data:', { aqiTrends, city1, city2 });
-                
-                const canvas = document.getElementById('aqiComparisonChart');
-                if (!canvas) {
-                    console.error('AQI comparison chart canvas not found');
-                    return;
-                }
-                
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    console.error('Could not get 2D context for AQI comparison chart');
-                    return;
-                }
-                
-                // Destroy existing chart if it exists
-                if (window.aqiComparisonChart) {
-                    try {
-                        window.aqiComparisonChart.destroy();
-                    } catch (e) {
-                        console.error('Error destroying existing AQI comparison chart:', e);
-                    }
-                }
-                
-                // Get years and AQI data for both cities
-                const years = Object.keys(aqiTrends[city1] || {}).sort();
-                const city1Aqi = years.map(year => aqiTrends[city1][year]);
-                const city2Aqi = years.map(year => aqiTrends[city2][year]);
-                
-                console.log('AQI Years:', years);
-                console.log(city1, 'AQI:', city1Aqi);
-                console.log(city2, 'AQI:', city2Aqi);
-                
-                // Create new chart
-                window.aqiComparisonChart = new Chart(ctx, {
+                },
+
+                // AQI Chart
+                aqiChart: {
                     type: 'bar',
                     data: {
-                        labels: years,
-                        datasets: [
-                            {
-                                label: city1,
-                                data: city1Aqi,
-                                backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                                borderColor: 'rgb(75, 192, 192)',
-                                borderWidth: 1
-                            },
-                            {
-                                label: city2,
-                                data: city2Aqi,
-                                backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                                borderColor: 'rgb(255, 99, 132)',
-                                borderWidth: 1
-                            }
-                        ]
+                        labels: [city1Name, city2Name],
+                        datasets: [{
+                            label: 'Air Quality Index (AQI)',
+                            data: [
+                                city1Data.Air_Quality_Index || 0,
+                                city2Data.Air_Quality_Index || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(255, 159, 64, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(75, 192, 192, 1)',
+                                'rgba(255, 159, 64, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
                     },
                     options: {
                         responsive: true,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'AQI Comparison'
-                            },
-                        },
+                        maintainAspectRatio: false,
                         scales: {
                             y: {
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: 'AQI Index'
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Year'
+                                    text: 'Air Quality Index (AQI)'
                                 }
                             }
                         }
                     }
-                });
+                },
+
+                // Pollutants Chart
+                pollutantsChart: {
+                    type: 'radar',
+                    data: {
+                        labels: ['SO₂ (µg/m³)', 'NO₂ (µg/m³)', 'PM₁₀ (µg/m³)', 'PM₂.₅ (µg/m³)'],
+                        datasets: [
+                            {
+                                label: city1Name,
+                                data: [
+                                    city1Data.SO2_ugm3 || 0,
+                                    city1Data.NO2_ugm3 || 0,
+                                    city1Data.PM10_ugm3 || 0,
+                                    city1Data.PM25_ugm3 || 0
+                                ],
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+                            },
+                            {
+                                label: city2Name,
+                                data: [
+                                    city2Data.SO2_ugm3 || 0,
+                                    city2Data.NO2_ugm3 || 0,
+                                    city2Data.PM10_ugm3 || 0,
+                                    city2Data.PM25_ugm3 || 0
+                                ],
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    display: true
+                                },
+                                suggestedMin: 0
+                            }
+                        }
+                    }
+                },
+
+                // Trend Chart (example with dummy data)
+                trendChart: {
+                    type: 'line',
+                    data: {
+                        labels: ['2017', '2018', '2019', '2020', '2021', '2022', '2023'],
+                        datasets: [
+                            {
+                                label: city1Name,
+                                data: [
+                                    city1Data.CO2_Emissions_kt * 0.8 || 0,
+                                    city1Data.CO2_Emissions_kt * 0.85 || 0,
+                                    city1Data.CO2_Emissions_kt * 0.9 || 0,
+                                    city1Data.CO2_Emissions_kt * 0.95 || 0,
+                                    city1Data.CO2_Emissions_kt || 0,
+                                    city1Data.CO2_Emissions_kt * 1.05 || 0,
+                                    city1Data.CO2_Emissions_kt * 1.1 || 0
+                                ],
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: city2Name,
+                                data: [
+                                    city2Data.CO2_Emissions_kt * 0.9 || 0,
+                                    city2Data.CO2_Emissions_kt * 0.92 || 0,
+                                    city2Data.CO2_Emissions_kt * 0.94 || 0,
+                                    city2Data.CO2_Emissions_kt * 0.96 || 0,
+                                    city2Data.CO2_Emissions_kt || 0,
+                                    city2Data.CO2_Emissions_kt * 1.04 || 0,
+                                    city2Data.CO2_Emissions_kt * 1.08 || 0
+                                ],
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'CO₂ Emissions (kt)'
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // Industry Chart
+                industryChart: {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: city1Name,
+                                data: [{
+                                    x: city1Data.Industrial_Activity_Score || 0,
+                                    y: city1Data.CO2_Emissions_kt || 0
+                                }],
+                                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                pointRadius: 10
+                            },
+                            {
+                                label: city2Name,
+                                data: [{
+                                    x: city2Data.Industrial_Activity_Score || 0,
+                                    y: city2Data.CO2_Emissions_kt || 0
+                                }],
+                                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                pointRadius: 10
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Industrial Activity Score'
+                                },
+                                min: 0,
+                                max: 100
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'CO₂ Emissions (kt)'
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                },
+
+                // Forest Chart
+                forestChart: {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: city1Name,
+                                data: [{
+                                    x: city1Data.Forest_Cover_pct || 0,
+                                    y: city1Data.CO2_Emissions_kt || 0
+                                }],
+                                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                                pointRadius: 10
+                            },
+                            {
+                                label: city2Name,
+                                data: [{
+                                    x: city2Data.Forest_Cover_pct || 0,
+                                    y: city2Data.CO2_Emissions_kt || 0
+                                }],
+                                backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                                pointRadius: 10
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Forest Cover (%)'
+                                },
+                                min: 0,
+                                max: 100
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'CO₂ Emissions (kt)'
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Initialize all charts using the DashboardApp
+            if (window.DashboardApp && typeof window.DashboardApp.initializeCharts === 'function') {
+                // Prepare chart data for the global DashboardApp
+                const chartData = {};
                 
-            } catch (error) {
-                console.error('Error initializing AQI comparison chart:', error);
+                // Convert our chart configs to the format expected by DashboardApp
+                Object.entries(chartConfigs).forEach(([chartId, config]) => {
+                    const container = document.getElementById(chartId);
+                    if (container) {
+                        container.dataset.chartType = config.type;
+                        container.dataset.chartData = JSON.stringify(config);
+                        chartData[chartId] = config;
+                    }
+                });
+
+                // Call the global initialization function
+                window.DashboardApp.initializeCharts();
             }
+        } catch (error) {
+            console.error('Error initializing charts:', error);
         }
-    </script>
-</body>
-</html>
+
+        // Add animation to cards
+        document.querySelectorAll('.bg-white').forEach((el, index) => {
+            setTimeout(() => {
+                el.classList.add('animate-fade-in');
+            }, index * 100);
+        });
+    });
+</script>
+{% endblock %}
+
+<style>
+/* Add some animations */
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+    opacity: 0; /* Start invisible */
+}

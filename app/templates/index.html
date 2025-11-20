@@ -2,17 +2,19 @@
 
 {% block main_content %}
 <!-- Main Content -->
-<div class="space-y-8">
+<div class="space-y-6 sm:space-y-8">
     <!-- Existing charts will be here -->
     {{ super() }}
     
     <!-- Correlation Heatmap Section -->
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Correlation Analysis</h2>
-        <p class="text-gray-600 mb-4">Explore relationships between different city metrics. Values range from -1 (perfect negative correlation) to 1 (perfect positive correlation).</p>
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Correlation Analysis</h2>
+        <p class="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">Explore relationships between different city metrics. Values range from -1 (perfect negative correlation) to 1 (perfect positive correlation).</p>
         {% if plots.correlation_heatmap %}
-            <div class="bg-white p-2 rounded border overflow-x-auto">
-                <img src="data:image/png;base64,{{ plots.correlation_heatmap }}" alt="Correlation Heatmap" class="mx-auto">
+            <div class="bg-white p-1 sm:p-2 rounded border overflow-x-auto">
+                <div class="min-w-max">
+                    <img src="data:image/png;base64,{{ plots.correlation_heatmap }}" alt="Correlation Heatmap" class="w-full h-auto max-w-full">
+                </div>
             </div>
         {% else %}
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
@@ -32,65 +34,65 @@
         {% endif %}
         
         <!-- Footer -->
-        <footer class="mt-12 text-center text-sm text-gray-500">
+        <footer class="mt-8 sm:mt-12 text-center text-xs sm:text-sm text-gray-500">
             <p>© 2024 CO2 Emissions Dashboard | Data updated monthly</p>
             <p class="mt-1">For more information, contact the Maharashtra Pollution Control Board</p>
         </footer>
     </div>
     
     <!-- Comparison Section (initially hidden) -->
-    <div id="comparisonSection" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">City Comparison</h2>
+    <div id="comparisonSection" class="hidden space-y-4 sm:space-y-6">
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+            <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">City Comparison</h2>
             
             <!-- Comparison Summary -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 id="city1Name" class="text-lg font-semibold mb-3">City 1</h3>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">CO₂ Emissions (kt):</span>
-                            <span id="city1Emission" class="font-medium">-</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                    <h3 id="city1Name" class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">City 1</h3>
+                    <div class="space-y-1.5 sm:space-y-2 text-sm sm:text-base">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">CO₂ (kt):</span>
+                            <span id="city1Emission" class="font-medium ml-2">-</span>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Average AQI:</span>
-                            <span id="city1Aqi" class="font-medium">-</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">Avg AQI:</span>
+                            <span id="city1Aqi" class="font-medium ml-2">-</span>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Industrial Activity:</span>
-                            <span id="city1Industry" class="font-medium">-</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">Industry:</span>
+                            <span id="city1Industry" class="font-medium ml-2">-</span>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 id="city2Name" class="text-lg font-semibold mb-3">City 2</h3>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">CO₂ Emissions (kt):</span>
-                            <span id="city2Emission" class="font-medium">-</span>
+                <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                    <h3 id="city2Name" class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">City 2</h3>
+                    <div class="space-y-1.5 sm:space-y-2 text-sm sm:text-base">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">CO₂ (kt):</span>
+                            <span id="city2Emission" class="font-medium ml-2">-</span>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Average AQI:</span>
-                            <span id="city2Aqi" class="font-medium">-</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">Avg AQI:</span>
+                            <span id="city2Aqi" class="font-medium ml-2">-</span>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Industrial Activity:</span>
-                            <span id="city2Industry" class="font-medium">-</span>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 whitespace-nowrap">Industry:</span>
+                            <span id="city2Industry" class="font-medium ml-2">-</span>
                         </div>
                     </div>
                 </div>
             </div>
             
             <!-- Comparison Charts -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white p-4 border rounded-lg">
-                    <h3 class="text-lg font-semibold mb-4">CO₂ Emissions Trend (2017-2024)</h3>
-                    <div id="emissionTrendChart" class="h-64"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div class="bg-white p-3 sm:p-4 border rounded-lg">
+                    <h3 class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">CO₂ Emissions Trend (2017-2024)</h3>
+                    <div id="emissionTrendChart" class="h-48 sm:h-56 md:h-64"></div>
                 </div>
-                <div class="bg-white p-4 border rounded-lg">
-                    <h3 class="text-lg font-semibold mb-4">AQI Comparison (2017-2024)</h3>
-                    <div id="aqiComparisonChart" class="h-64"></div>
+                <div class="bg-white p-3 sm:p-4 border rounded-lg">
+                    <h3 class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">AQI Comparison (2017-2024)</h3>
+                    <div id="aqiComparisonChart" class="h-48 sm:h-56 md:h-64"></div>
                 </div>
             </div>
         </div>

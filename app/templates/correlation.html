@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block main_content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Correlation Analysis</h2>
+    <p class="text-gray-600">Understanding relationships between different environmental metrics</p>
+</div>
+
+<div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">Correlation Heatmap</h2>
+    <p class="text-gray-600 mb-4">This heatmap shows the correlation between different environmental metrics. Values range from -1 to 1, where:</p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-blue-50 p-4 rounded-lg">
+            <h3 class="font-medium text-blue-800">Positive Correlation (0 to 1)</h3>
+            <p class="text-sm text-gray-600">As one variable increases, the other tends to increase</p>
+        </div>
+        <div class="bg-red-50 p-4 rounded-lg">
+            <h3 class="font-medium text-red-800">Negative Correlation (-1 to 0)</h3>
+            <p class="text-sm text-gray-600">As one variable increases, the other tends to decrease</p>
+        </div>
+    </div>
+    
+    <img src="data:image/png;base64,{{ plots.correlation_heatmap }}" alt="Correlation Heatmap" class="w-full rounded-lg border border-gray-200">
+    
+    <div class="mt-6">
+        <h3 class="font-medium text-gray-800 mb-2">Key Insights:</h3>
+        <ul class="list-disc pl-5 space-y-1 text-gray-700">
+            <li>Strong positive correlations (close to 1) indicate that the variables move together</li>
+            <li>Strong negative correlations (close to -1) indicate an inverse relationship</li>
+            <li>Values near 0 suggest little to no linear relationship</li>
+        </ul>
+    </div>
+</div>
+
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">How to Interpret</h2>
+    <div class="prose max-w-none">
+        <p class="text-gray-700">The correlation matrix helps identify relationships between different environmental factors. For example:</p>
+        <ul class="list-disc pl-5 space-y-1 text-gray-700">
+            <li>If CO2 emissions and industrial activity show high positive correlation, it suggests that industrial areas contribute significantly to emissions</li>
+            <li>If forest cover shows negative correlation with emissions, it suggests that areas with more trees tend to have lower emissions</li>
+            <li>Neutral correlations (near 0) indicate that the variables don't have a strong linear relationship</li>
+        </ul>
+        <p class="mt-4 text-gray-700">These insights can help in understanding the complex relationships between different environmental factors and guide decision-making for emission reduction strategies.</p>
+    </div>
+</div>
+{% endblock %}
