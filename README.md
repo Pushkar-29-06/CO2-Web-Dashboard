@@ -12,10 +12,11 @@ A comprehensive web-based dashboard for analyzing and visualizing CO₂ emission
 ## 🆕 Latest Updates
 
 - **Python 3.13.2 Compatibility**: Updated to work with the latest Python version
-- **Enhanced Visualizations**: Completely revamped comparison charts with improved interactivity
-- **Data-Driven Insights**: New visualizations for emissions trends and environmental factors
-- **Performance Optimizations**: Faster chart rendering and data processing
-- **Improved Mobile Experience**: Better touch controls and responsive layouts
+- **Enhanced City Comparison**: Added validation to prevent comparing the same cities
+- **Interactive Charts**: Uses both Chart.js and Plotly.js for comprehensive visualizations
+- **Improved Error Handling**: Better user feedback and validation messages
+- **Responsive Design**: Fully responsive across all devices with Tailwind CSS
+- **Data Validation**: Robust input validation and error handling for all endpoints
 
 ## ✨ Features
 
@@ -31,7 +32,7 @@ A comprehensive web-based dashboard for analyzing and visualizing CO₂ emission
 ### 🤖 Prediction Model
 - **CO₂ Emissions Prediction**
   - Machine learning model for forecasting city-wise CO₂ emissions
-  - Multiple regression analysis for accurate predictions
+  - Multiple regression analysis for predictions
   - Handles various input parameters:
     - Historical emissions data
     - Industrial activity scores

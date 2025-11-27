@@ -199,7 +199,13 @@ def compare_cities():
         # Get actual city names with correct case
         actual_city1 = city_map[city1_lower]
         actual_city2 = city_map[city2_lower]
-        
+
+        # Check if the cities are the same
+        if actual_city1 == actual_city2:
+            error_msg = 'Please select two different cities to compare'
+            print(f"Error: {error_msg}")
+            return jsonify({'error': error_msg}), 400
+
         print(f"Found cities: {actual_city1} and {actual_city2}")
         
         # Debug: Print city data
@@ -378,6 +384,14 @@ def compare():
                                 error_message=error_msg,
                                 error_code=400), 400
         
+        # Check if the provided cities are the same
+        if city1 == city2:
+            error_msg = "Please select two different cities to compare."
+            print(error_msg)
+            return render_template('error.html',
+                                error_message=error_msg,
+                                error_code=400), 400
+
         # Check if the provided cities exist in the dataset
         if city1 not in available_cities or city2 not in available_cities:
             error_msg = f"One or both cities not found in the dataset. Please select from the available cities."
@@ -402,33 +416,31 @@ def compare():
             def prepare_city_data(city_name, city_df):
                 # Get all years of data for the city
                 years = city_df['Year'].astype(int).tolist()
-                
+
                 # Prepare emissions data for all available years
                 emissions_data = {}
                 for year in years:
                     year_data = city_df[city_df['Year'] == year].iloc[0]
                     emissions_data[str(year)] = float(year_data.get('CO2_Emission_kt', 0))
-                
+
                 # Get latest data
                 latest = city_df.iloc[-1]
-                
+
                 return {
-                    'name': city_name,
-                    'state': latest.get('State', ''),
-                    'year': int(latest.get('Year', 2023)),
-                    'emissions': emissions_data,
-                    'metrics': {
-                        'co2': float(latest.get('CO2_Emission_kt', 0)),
-                        'so2': float(latest.get('SO2_Annual_Avg_ugm3', 0)),
-                        'no2': float(latest.get('NO2_Annual_Avg_ugm3', 0)),
-                        'pm10': float(latest.get('PM10_Annual_Avg_ugm3', 0)),
-                        'pm25': float(latest.get('PM2.5_Annual_Avg_ugm3', 0)),
-                        'aqi': int(latest.get('AQI_Index', 0)),
-                        'population': float(latest.get('Population_M', 0)),
-                        'vehicle_density': int(latest.get('Vehicle_Density_per_km2', 0)),
-                        'industry': float(latest.get('Industrial_Activity_Score', 0)),
-                        'forest_cover': float(latest.get('Forest_Cover_pct', 0))
-                    }
+                    'City': city_name,
+                    'State': latest.get('State', ''),
+                    'Year': int(latest.get('Year', 2023)),
+                    'CO2_Emissions_kt': float(latest.get('CO2_Emission_kt', 0)),
+                    'AQI': int(latest.get('AQI_Index', 0)),
+                    'SO2_ppb': float(latest.get('SO2_Annual_Avg_ugm3', 0)),
+                    'NO2_ppb': float(latest.get('NO2_Annual_Avg_ugm3', 0)),
+                    'PM2.5_ug/m3': float(latest.get('PM2.5_Annual_Avg_ugm3', 0)),
+                    'PM10_ug/m3': float(latest.get('PM10_Annual_Avg_ugm3', 0)),
+                    'Population': float(latest.get('Population_M', 0)),
+                    'Vehicle_Density': int(latest.get('Vehicle_Density_per_km2', 0)),
+                    'Industrial_Activity_Score': float(latest.get('Industrial_Activity_Score', 0)),
+                    'Forest_Cover_pct': float(latest.get('Forest_Cover_pct', 0)),
+                    'emissions': emissions_data
                 }
             
             # Prepare data for both cities
@@ -440,8 +452,8 @@ def compare():
             
             # Prepare the final data structure for the template
             template_data = {
-                'city1': city1_data['name'],
-                'city2': city2_data['name'],
+                'city1': city1_data['City'],
+                'city2': city2_data['City'],
                 'city1_data': city1_data,
                 'city2_data': city2_data,
                 'available_cities': available_cities,
@@ -452,30 +464,20 @@ def compare():
             print(f"City 1 data sample: {str(city1_data)[:200]}...")
             print(f"City 2 data sample: {str(city2_data)[:200]}...")
             
-            # Generate comparison visualizations
+            # Generate comparison visualizations using Python libraries
             try:
-                # Create a temporary DataFrame with just the two cities for visualization
-                comparison_df = pd.concat([city1_data_all, city2_data_all])
-                
-                # Create visualizations
-                emissions_plot = create_emissions_trend_plot(comparison_df)
-                aqi_plot = create_aqi_emissions_plot(comparison_df)
-                industry_plot = create_industry_emissions_plot(comparison_df)
-                
-                # Add visualization URLs to the template data
-                template_data['visualizations'] = {
-                    'emissions_trend': emissions_plot,
-                    'aqi_vs_emissions': aqi_plot,
-                    'industry_vs_emissions': industry_plot
-                }
-                
+                print("Generating comparison visualizations...")
+
+                # Create comparison charts using matplotlib/seaborn
+                template_data['visualizations'] = create_city_comparison_charts(city1_data, city2_data)
+
                 print("Successfully generated visualizations")
-                
+
             except Exception as e:
-                print(f"Warning: Could not generate all visualizations: {str(e)}")
-                # Continue without visualizations if there's an error
+                print(f"Warning: Could not generate visualizations: {str(e)}")
                 import traceback
                 traceback.print_exc()
+                template_data['visualizations'] = {}
             
             return render_template('comparison.html', **template_data)
             
